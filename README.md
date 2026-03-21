@@ -6,6 +6,7 @@
 [![HuggingFace Dataset — 40K rows](https://img.shields.io/badge/HuggingFace-40K%20rows-FFD21E?logo=huggingface&logoColor=black)](https://huggingface.co/datasets/Taylor658/deep-space-optical-chip-thermal-dataset)
 [![Streamlit](https://img.shields.io/badge/Streamlit-Demo-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![XGBoost](https://img.shields.io/badge/XGBoost-Classifier-blue)](https://xgboost.readthedocs.io/)
+[![Contact A Taylor](https://img.shields.io/badge/Contact-A%20Taylor-brightgreen?style=for-the-badge&logo=mail.ru&logoColor=white)](https://ataylor.getform.com/5w8wz)
 
 > **Fine-tuned LLM on AWS Bedrock + physics simulator for recommending thermal mitigation strategies in deep-space photonic instruments**
 
@@ -274,4 +275,16 @@ Copyright (c) 2024 A Taylor
 
 ---
 
-**A Taylor** · [Dataset](https://huggingface.co/datasets/Taylor658/deep-space-optical-chip-thermal-dataset) · [AWS Bedrock](https://aws.amazon.com/bedrock/)
+## 📬 Contact
+
+Have questions, ideas, or want to collaborate? Reach out directly:
+
+<p align="center">
+  <a href="https://ataylor.getform.com/5w8wz">
+    <img src="https://img.shields.io/badge/Contact_A_Taylor-Get_In_Touch-brightgreen?style=for-the-badge&logo=mail.ru&logoColor=white" alt="Contact A Taylor" />
+  </a>
+</p>
+
+---
+
+**A Taylor** · [Contact](https://ataylor.getform.com/5w8wz) · [Dataset](https://huggingface.co/datasets/Taylor658/deep-space-optical-chip-thermal-dataset) · [AWS Bedrock](https://aws.amazon.com/bedrock/)
