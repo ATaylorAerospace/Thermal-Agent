@@ -271,7 +271,7 @@ pytest tests/test_classifier.py -v
 
 This work is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
-Copyright (c) 2024 A Taylor
+Copyright (c) 2026 A Taylor
 
 ---
 
@@ -287,4 +287,4 @@ Have questions, ideas, or want to collaborate? Reach out directly:
 
 ---
 
-**A Taylor** · [Contact](https://ataylor.getform.com/5w8wz) · [Dataset](https://huggingface.co/datasets/Taylor658/deep-space-optical-chip-thermal-dataset) · [AWS Bedrock](https://aws.amazon.com/bedrock/)
+**A Taylor** · [Contact](https://ataylor.getform.com/5w8wz) · [Dataset](https://huggingface.co/datasets/Taylor658/deep-space-optical-chip-thermal-dataset) 
