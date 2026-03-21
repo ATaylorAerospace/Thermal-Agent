@@ -8,9 +8,9 @@
 [![XGBoost](https://img.shields.io/badge/XGBoost-Classifier-blue)](https://xgboost.readthedocs.io/)
 [![Contact A Taylor](https://img.shields.io/badge/Contact-A%20Taylor-brightgreen?style=for-the-badge&logo=mail.ru&logoColor=white)](https://ataylor.getform.com/5w8wz)
 
-> **Fine-tuned LLM on AWS Bedrock + physics simulator for recommending thermal mitigation strategies in deep-space photonic instruments**
+> **Fine tuned LLM on AWS Bedrock + physics simulator for recommending thermal mitigation strategies in deep space photonic instruments**
 
-*Physics simulation · Bedrock fine-tuning · XGBoost classification · Streamlit demo*
+*Physics simulation · Bedrock fine tuning · XGBoost classification · Streamlit demo*
 
 **Author: A Taylor**
 
@@ -18,7 +18,7 @@
 
 ## 💡 The Problem
 
-Photonic Integrated Circuits (PICs) are the backbone of next-generation deep-space instruments — spectrometers, laser communication terminals, waveguide sensor arrays, and photonic signal processors. But space is brutal:
+Photonic Integrated Circuits (PICs) are the backbone of next generation space probe instruments that operate in deep space — spectrometers, laser communication terminals, waveguide sensor arrays, and photonic signal processors. But space is brutal:
 
 - **🌡️ Spectral drift** — temperature swings shift refractive indices, pushing resonant wavelengths off-target and corrupting measurements
 - **📐 Waveguide misalignment** — differential thermal expansion between chip layers destroys optical coupling, killing signal throughput
