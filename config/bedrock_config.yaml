@@ -1,0 +1,21 @@
+# AWS Bedrock Fine-Tuning Configuration
+# Author: A Taylor
+
+job:
+  name: deep-space-photonics-thermal-ft
+  base_model_id: amazon.titan-text-express-v1
+  role_arn: ${BEDROCK_ROLE_ARN}
+
+s3:
+  bucket: ${S3_BUCKET}
+  train_data_key: fine-tuning/train.jsonl
+  validation_data_key: fine-tuning/validation.jsonl
+  output_prefix: fine-tuning/output/
+
+hyperparameters:
+  epochCount: 3
+  batchSize: 8
+  learningRate: 0.00005
+  warmupSteps: 100
+
+validation_split: 0.1
