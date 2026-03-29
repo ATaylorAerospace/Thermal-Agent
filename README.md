@@ -13,8 +13,6 @@
 
 *Physics simulation · Bedrock fine tuning · XGBoost classification · Streamlit demo*
 
-**Author: A Taylor**
-
 ---
 
 ## 💡 The Problem
