@@ -1,4 +1,4 @@
-![thermalagent](docs/thermal.png)
+![thermalagent](docs/thermals.png)
 
 # 🛸 Deep-Space Photonics Thermal Advisor
 
