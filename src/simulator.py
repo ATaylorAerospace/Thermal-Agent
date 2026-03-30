@@ -4,7 +4,9 @@ Physics-based thermal drift simulator for deep-space photonic chips.
 Author: A Taylor
 """
 
-MATERIAL_PROPERTIES = {
+from typing import Optional
+
+MATERIAL_PROPERTIES: dict[str, dict[str, float]] = {
     "Silicon": {
         "dn_dT": 1.86e-4,
         "alpha": 2.6e-6,
@@ -23,7 +25,7 @@ MATERIAL_PROPERTIES = {
     },
 }
 
-ENVIRONMENT_DELTA_T = {
+ENVIRONMENT_DELTA_T: dict[str, int] = {
     "Near Earth Deep Space": 120,
     "Mars Transit": 150,
     "Jovian System": 180,
@@ -37,7 +39,22 @@ class ThermalDriftSimulator:
     Author: A Taylor
     """
 
-    def compute_refractive_index_shift(self, material, delta_T):
+    def _validate_material(self, material: str) -> None:
+        """Validate that the material name is recognized.
+
+        Args:
+            material: Material name to validate.
+
+        Raises:
+            ValueError: If the material is not in MATERIAL_PROPERTIES.
+        """
+        if material not in MATERIAL_PROPERTIES:
+            raise ValueError(
+                f"Unknown material: {material}. "
+                f"Valid materials: {list(MATERIAL_PROPERTIES.keys())}"
+            )
+
+    def compute_refractive_index_shift(self, material: str, delta_T: float) -> float:
         """Compute refractive index shift: delta_n = dn/dT * delta_T.
 
         Args:
@@ -50,12 +67,11 @@ class ThermalDriftSimulator:
         Raises:
             ValueError: If the material is not recognized.
         """
-        if material not in MATERIAL_PROPERTIES:
-            raise ValueError(f"Unknown material: {material}. Valid materials: {list(MATERIAL_PROPERTIES.keys())}")
+        self._validate_material(material)
         dn_dT = MATERIAL_PROPERTIES[material]["dn_dT"]
         return dn_dT * delta_T
 
-    def compute_mechanical_strain(self, material, delta_T):
+    def compute_mechanical_strain(self, material: str, delta_T: float) -> float:
         """Compute mechanical strain: epsilon = alpha * delta_T.
 
         Args:
@@ -68,12 +84,11 @@ class ThermalDriftSimulator:
         Raises:
             ValueError: If the material is not recognized.
         """
-        if material not in MATERIAL_PROPERTIES:
-            raise ValueError(f"Unknown material: {material}. Valid materials: {list(MATERIAL_PROPERTIES.keys())}")
+        self._validate_material(material)
         alpha = MATERIAL_PROPERTIES[material]["alpha"]
         return alpha * delta_T
 
-    def classify_risk(self, delta_n, strain):
+    def classify_risk(self, delta_n: float, strain: float) -> str:
         """Classify thermal risk based on refractive index shift and strain.
 
         Args:
@@ -92,7 +107,9 @@ class ThermalDriftSimulator:
         else:
             return "Low"
 
-    def evaluate(self, material, environment, delta_T=None):
+    def evaluate(
+        self, material: str, environment: str, delta_T: Optional[float] = None
+    ) -> dict:
         """Run a full thermal evaluation for a material-environment combination.
 
         Args:
@@ -136,7 +153,7 @@ class ThermalDriftSimulator:
         }
 
     @staticmethod
-    def get_all_materials():
+    def get_all_materials() -> list[str]:
         """Return a list of all supported material names.
 
         Returns:
@@ -145,7 +162,7 @@ class ThermalDriftSimulator:
         return list(MATERIAL_PROPERTIES.keys())
 
     @staticmethod
-    def get_all_environments():
+    def get_all_environments() -> list[str]:
         """Return a list of all supported environment names.
 
         Returns:
