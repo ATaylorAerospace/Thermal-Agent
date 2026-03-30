@@ -5,7 +5,6 @@ Author: A Taylor
 """
 
 import argparse
-import json
 import logging
 import time
 
