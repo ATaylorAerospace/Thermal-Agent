@@ -7,6 +7,7 @@ Author: A Taylor
 import os
 import sys
 
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
@@ -97,8 +98,6 @@ with tab_sim:
         for mat, props in MATERIAL_PROPERTIES.items():
             mat_data.append({"Material": mat, "Property": "dn/dT", "Value": props["dn_dT"]})
             mat_data.append({"Material": mat, "Property": "\u03b1 (CTE)", "Value": props["alpha"]})
-
-        import pandas as pd
 
         mat_df = pd.DataFrame(mat_data)
         fig = px.bar(
