@@ -63,11 +63,13 @@ class BedrockInferenceClient:
         output_text = results[0].get("outputText", "") if results else ""
         return output_text
 
-    def stream_invoke(self, prompt):
+    def stream_invoke(self, prompt, max_tokens=512, temperature=0.3):
         """Stream tokens from the model using invoke_model_with_response_stream.
 
         Args:
             prompt: The input prompt string.
+            max_tokens: Maximum number of tokens to generate.
+            temperature: Sampling temperature.
 
         Yields:
             Token strings as they arrive.
@@ -75,8 +77,8 @@ class BedrockInferenceClient:
         body = json.dumps({
             "inputText": prompt,
             "textGenerationConfig": {
-                "maxTokenCount": 512,
-                "temperature": 0.3,
+                "maxTokenCount": max_tokens,
+                "temperature": temperature,
             },
         })
 
