@@ -45,6 +45,17 @@ class StrategyClassifier:
         self.target_encoder = LabelEncoder()
         self._is_fitted = False
 
+    def _check_is_fitted(self):
+        """Verify the classifier has been trained or loaded before prediction.
+
+        Raises:
+            RuntimeError: If the model has not been fitted.
+        """
+        if not self._is_fitted:
+            raise RuntimeError(
+                "Classifier is not fitted. Call train() or load() before predict()."
+            )
+
     def prepare_features(self, df):
         """Label-encode categorical columns for model input.
 
@@ -112,7 +123,11 @@ class StrategyClassifier:
 
         Returns:
             Predicted strategy string.
+
+        Raises:
+            RuntimeError: If the model has not been fitted.
         """
+        self._check_is_fitted()
         row = pd.DataFrame([{
             "material_name": material,
             "instrument": instrument,
@@ -134,7 +149,11 @@ class StrategyClassifier:
 
         Returns:
             Dict mapping strategy name to probability.
+
+        Raises:
+            RuntimeError: If the model has not been fitted.
         """
+        self._check_is_fitted()
         row = pd.DataFrame([{
             "material_name": material,
             "instrument": instrument,
