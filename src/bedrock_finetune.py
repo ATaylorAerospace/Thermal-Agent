@@ -31,6 +31,7 @@ class BedrockFineTuneManager:
         Args:
             config_path: Path to the Bedrock config YAML.
         """
+        self.config_path = config_path
         with open(config_path, "r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
 
@@ -38,6 +39,15 @@ class BedrockFineTuneManager:
         self.job_config = self.config.get("job", {})
         self.s3_config = self.config.get("s3", {})
         self.hyperparameters = self.config.get("hyperparameters", {})
+
+    def __repr__(self):
+        """Return a developer-friendly string representation."""
+        job_name = self.job_config.get("name", "unknown")
+        base_model = self.job_config.get("base_model_id", "unknown")
+        return (
+            f"BedrockFineTuneManager(config='{self.config_path}', "
+            f"job='{job_name}', base_model='{base_model}')"
+        )
 
     def start_job(self):
         """Create and start a Bedrock model customization job.
