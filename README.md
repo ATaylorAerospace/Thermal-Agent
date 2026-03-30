@@ -2,11 +2,13 @@
 
 # 🛸 Deep-Space Photonics Thermal Advisor
 
+[![CI](https://github.com/ATaylorAerospace/Thermal-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/ATaylorAerospace/Thermal-Agent/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
 [![HuggingFace Dataset — 40K rows](https://img.shields.io/badge/HuggingFace-40K%20rows-FFD21E?logo=huggingface&logoColor=black)](https://huggingface.co/datasets/Taylor658/deep-space-optical-chip-thermal-dataset)
 [![Streamlit](https://img.shields.io/badge/Streamlit-Demo-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![XGBoost](https://img.shields.io/badge/XGBoost-Classifier-blue)](https://xgboost.readthedocs.io/)
+[![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 [![Contact A Taylor](https://img.shields.io/badge/Contact-A%20Taylor-brightgreen?logo=mail.ru&logoColor=white)](https://ataylor.getform.com/5w8wz)
 
 > **Fine tuned LLM on AWS Bedrock + physics simulator for recommending thermal mitigation strategies in deep space photonic instruments**
@@ -37,6 +39,7 @@ This project combines **deterministic physics** with **AI-driven recommendations
 | 🤖 **Bedrock Fine-Tuned LLM** | Generates detailed strategy recommendations trained on 40K scenarios | ✅ Live |
 | 📊 **XGBoost Classifier** | Fast Passive / Active / Hybrid prediction with calibrated probabilities | ✅ Live |
 | 🖥️ **Streamlit App** | Interactive two-mode demo (physics + AI advisor) | ✅ Live |
+| 🧪 **CI Pipeline** | Automated pytest across Python 3.10–3.12 on every push and PR | ✅ Live |
 
 ---
 
@@ -94,8 +97,8 @@ This project combines **deterministic physics** with **AI-driven recommendations
 
 ```bash
 # Clone
-git clone https://github.com/ATaylorAerospace/deep-space-photonics-thermal-advisor.git
-cd deep-space-photonics-thermal-advisor
+git clone https://github.com/ATaylorAerospace/Thermal-Agent.git
+cd Thermal-Agent
 
 # Install
 pip install -r requirements.txt
@@ -203,31 +206,39 @@ bash scripts/run_pipeline.sh
 ## 📁 Repository Structure
 
 ```
-deep-space-photonics-thermal-advisor/
-├── notebooks/
-│   ├── 01_eda.ipynb                 # Exploratory data analysis
-│   └── 02_bedrock_fine_tuning.ipynb # End-to-end fine-tuning walkthrough
-├── src/
-│   ├── __init__.py
-│   ├── data_prep.py                 # HuggingFace → Bedrock JSONL → S3
-│   ├── simulator.py                 # Physics-based thermal drift engine
-│   ├── bedrock_finetune.py          # Bedrock job lifecycle manager
-│   ├── inference.py                 # Base + fine-tuned model inference
-│   └── strategy_classifier.py       # XGBoost Passive/Active/Hybrid
+Thermal-Agent/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                   # GitHub Actions CI — pytest on 3.10–3.12
 ├── app/
 │   └── streamlit_app.py             # Interactive two-tab demo
 ├── config/
 │   └── bedrock_config.yaml          # Bedrock hyperparameters & S3 paths
+├── docs/
+│   └── thermals.png                 # Hero banner image
+├── notebooks/
+│   ├── 01_eda.ipynb                 # Exploratory data analysis
+│   └── 02_bedrock_fine_tuning.ipynb # End-to-end fine-tuning walkthrough
 ├── results/                         # Model artifacts & evaluation outputs
-├── tests/
-│   ├── test_simulator.py            # Physics simulator tests
-│   └── test_classifier.py           # Classifier tests
 ├── scripts/
 │   └── run_pipeline.sh              # Full pipeline runner
+├── src/
+│   ├── __init__.py                  # Public API exports
+│   ├── bedrock_finetune.py          # Bedrock job lifecycle manager
+│   ├── data_prep.py                 # HuggingFace → Bedrock JSONL → S3
+│   ├── inference.py                 # Base + fine-tuned model inference
+│   ├── simulator.py                 # Physics-based thermal drift engine
+│   └── strategy_classifier.py       # XGBoost Passive/Active/Hybrid
+├── tests/
+│   ├── __init__.py                  # Test package init
+│   ├── test_classifier.py           # Classifier tests
+│   └── test_simulator.py            # Physics simulator tests
 ├── .env.example                     # AWS credential template
 ├── .gitignore
-├── requirements.txt
-└── README.md
+├── conftest.py                      # Pytest path configuration
+├── CONTRIBUTING.md                  # Development setup & PR guidelines
+├── README.md
+└── requirements.txt
 ```
 
 ---
@@ -235,7 +246,7 @@ deep-space-photonics-thermal-advisor/
 ## 🧩 Components
 
 ### 🔬 Physics Simulator (`src/simulator.py`)
-Computes **refractive index shift** (Δn = dn/dT × ΔT) and **mechanical strain** (ε = α × ΔT) for any material-environment pair. Classifies risk as **Low → Moderate → High → Critical** and maps to a strategy hint.
+Computes **refractive index shift** (Δn = dn/dT × ΔT) and **mechanical strain** (ε = α × ΔT) for any material-environment pair. Classifies risk as **Low → Moderate → High → Critical** and maps to a strategy hint. Fully type-annotated for IDE support.
 
 ### 📋 Data Preparation (`src/data_prep.py`)
 Loads the HuggingFace dataset, converts to Bedrock-compatible `{"prompt": ..., "completion": ...}` JSONL, performs stratified train/validation splitting, and uploads to S3.
@@ -244,17 +255,19 @@ Loads the HuggingFace dataset, converts to Bedrock-compatible `{"prompt": ..., "
 Full lifecycle management — **start**, **monitor**, **cancel**, and **list** fine-tuning jobs on Amazon Titan Text Express.
 
 ### 🤖 Inference Client (`src/inference.py`)
-Synchronous and **streaming** inference against base and fine-tuned Bedrock models. Includes a structured prompt builder matching the training format and a side-by-side model comparison utility.
+Synchronous and **streaming** inference against base and fine-tuned Bedrock models. Both `invoke()` and `stream_invoke()` accept configurable `max_tokens` and `temperature` parameters. Includes a structured prompt builder matching the training format and a side-by-side model comparison utility.
 
 ### 📊 Strategy Classifier (`src/strategy_classifier.py`)
-XGBoost classifier predicting **Passive / Active / Hybrid** strategies with calibrated probability estimates. Fast fallback when Bedrock is unavailable.
+XGBoost classifier predicting **Passive / Active / Hybrid** strategies with calibrated probability estimates. Includes fitted-state validation to prevent silent failures. Fast fallback when Bedrock is unavailable.
 
 ---
 
 ## 🧪 Testing
 
+Tests run automatically via **GitHub Actions CI** on every push and pull request against Python 3.10, 3.11, and 3.12.
+
 ```bash
-# Run all tests
+# Run all tests locally
 pytest tests/ -v
 
 # Run simulator tests only
@@ -263,6 +276,12 @@ pytest tests/test_simulator.py -v
 # Run classifier tests only
 pytest tests/test_classifier.py -v
 ```
+
+---
+
+## 🤝 Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing instructions, and pull request guidelines.
 
 ---
 
@@ -279,3 +298,4 @@ Copyright (c) 2026 A Taylor
 Have questions, ideas, or want to collaborate? Reach out directly:
 
 [![Contact A Taylor](https://img.shields.io/badge/Contact-A%20Taylor-brightgreen?logo=mail.ru&logoColor=white)](https://ataylor.getform.com/5w8wz)
+
