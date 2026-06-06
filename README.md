@@ -55,28 +55,61 @@ This project pairs **deterministic physics** with an **agent that reasons over a
 
 ## 🏗️ Architecture
 
+### Runtime — agentic tool-use loop
+
 ```
-┌─────────────────────────────────────────────────────┐
-│              Streamlit Interactive App               │
-│        (Physics Simulator  ·  Agentic Advisor)       │
-├──────────────────────────────────────────────────────┤
-│                    ThermalAgent                      │
-│                 tool-use loop (Converse)             │
-├──────────────────────────┬───────────────────────────┤
-│   Bedrock backend        │   Local backend           │
-│   (managed FM)           │   (fine-tuned GGUF, OpenAI │
-│                          │    -compatible endpoint)   │
-├───────────────┬──────────┴───────┬───────────────────┤
-│  simulate_    │  classify_       │  search_thermal_   │
-│  thermal_     │  strategy        │  knowledge         │
-│  drift        │  (XGBoost)       │  (data store)      │
-├───────────────┴──────────────────┴───────────────────┤
-│   ThermalDriftSim   ·   StrategyClassifier   ·        │
-│   ThermalDataStore (TF-IDF retrieval over 40K rows)  │
-└──────────────────────────────────────────────────────┘
+                 ┌──────────────────────────────────────┐
+                 │        Streamlit Interactive App      │
+                 │   (Physics Simulator · Agentic Advisor)│
+                 └──────────────────────────────────────┘
+                                   │
+                                   ▼
+                 ┌──────────────────────────────────────┐
+                 │              ThermalAgent             │
+                 │       reason → act tool-use loop      │
+                 └──────────────────────────────────────┘
+                                   │
+                   ┌───────────────┴───────────────┐
+                   ▼                               ▼
+        ┌────────────────────┐         ┌────────────────────────┐
+        │   Bedrock backend  │         │      Local backend     │
+        │   (managed FM via  │         │  (fine-tuned GGUF via  │
+        │    Converse API)   │         │ OpenAI-compatible EP)  │
+        └────────────────────┘         └────────────────────────┘
+                   └───────────────┬───────────────┘
+                                   ▼
+                 ┌──────────────────────────────────────┐
+                 │             ToolDispatcher            │
+                 └──────────────────────────────────────┘
+                     │              │               │
+                     ▼              ▼               ▼
+            ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐
+            │  simulate_   │ │  classify_   │ │ search_thermal_  │
+            │  thermal_    │ │  strategy    │ │ knowledge        │
+            │  drift       │ │  (XGBoost)   │ │ (data store)     │
+            └──────────────┘ └──────────────┘ └──────────────────┘
+                     │              │               │
+                     ▼              ▼               ▼
+            ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐
+            │ ThermalDrift │ │  Strategy    │ │ ThermalDataStore │
+            │  Simulator   │ │  Classifier  │ │ TF-IDF · 40K rows│
+            └──────────────┘ └──────────────┘ └──────────────────┘
 ```
 
-The agent runs a **tool-use loop**: the model requests a tool, the `ToolDispatcher` executes it, the result is fed back, and the loop repeats until the model returns a final recommendation. The **model backend is pluggable** — the same loop runs against managed Bedrock or a self-hosted fine-tuned open-weight model (the `LocalToolBackend` translates Bedrock Converse ↔ OpenAI tool-calling). The data store is likewise backend-agnostic — the local TF-IDF index can be swapped for **Amazon Bedrock Knowledge Bases** in production without changing the agent or tools.
+The agent runs a **tool-use loop**: the model requests a tool, the `ToolDispatcher` executes it against the simulator, classifier, or data store, the result is fed back, and the loop repeats until the model returns a final recommendation. The **model backend is pluggable** — the same loop runs against managed Bedrock or a self-hosted fine-tuned open-weight model (the `LocalToolBackend` translates Bedrock Converse ↔ OpenAI tool-calling). The data store is likewise backend-agnostic — the local TF-IDF index can be swapped for **Amazon Bedrock Knowledge Bases** in production without changing the agent or tools.
+
+### Offline — open-weight fine-tuning pipeline (feeds the Local backend)
+
+```
+   HuggingFace          training_data.py         finetune.py        quantize.py
+   40K dataset    ──▶    SFT trace builder   ──▶  QLoRA 4-bit   ──▶  merge + GGUF   ──▶  GGUF
+                        (real Strategy            (LoRA adapter)     (Q4_K_M)            served by
+                         Classifier +                                                    Local backend
+                         ThermalDataStore →
+                         grounded tool traces)
+```
+
+The SFT builder runs the **real** `StrategyClassifier` and `ThermalDataStore` to ground each training trace in genuine tool outputs (with synthesized fallbacks for unseen inputs), so the fine-tuned open-weight model learns this stack's exact tool-calling dialect — not synthetic proxies.
 
 ---
 
