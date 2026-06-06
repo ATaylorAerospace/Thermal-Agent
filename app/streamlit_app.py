@@ -55,7 +55,39 @@ st.title("Deep-Space Photonics Thermal Advisor")
 
 tab_sim, tab_ai = st.tabs(["\U0001f52c Physics Simulator", "\U0001f916 AI Thermal Advisor"])
 
-simulator = ThermalDriftSimulator()
+@st.cache_resource
+def get_simulator():
+    """Return a cached ThermalDriftSimulator instance."""
+    return ThermalDriftSimulator()
+
+
+@st.cache_resource
+def get_classifier():
+    """Load and cache the XGBoost strategy classifier, if available.
+
+    Returns the fitted StrategyClassifier, or None if the model file is missing.
+    """
+    from src.strategy_classifier import StrategyClassifier
+
+    clf = StrategyClassifier()
+    model_path = os.path.join(
+        os.path.dirname(__file__), "..", "results", "strategy_classifier.pkl"
+    )
+    if os.path.exists(model_path):
+        clf.load(model_path)
+        return clf
+    return None
+
+
+@st.cache_resource
+def get_bedrock_client(model_id):
+    """Return a cached Bedrock inference client for the given model id."""
+    from src.inference import BedrockInferenceClient
+
+    return BedrockInferenceClient(model_id=model_id)
+
+
+simulator = get_simulator()
 materials = simulator.get_all_materials()
 environments = simulator.get_all_environments()
 
@@ -147,9 +179,7 @@ with tab_ai:
             )
         else:
             try:
-                from src.inference import BedrockInferenceClient
-
-                client = BedrockInferenceClient(model_id=bedrock_model_id)
+                client = get_bedrock_client(bedrock_model_id)
                 prompt = client.build_thermal_prompt(
                     ai_instrument, ai_material, ai_environment, ai_thermal_effect
                 )
@@ -173,14 +203,10 @@ with tab_ai:
         # XGBoost classifier prediction
         st.subheader("XGBoost Strategy Classifier")
         try:
-            from src.strategy_classifier import StrategyClassifier
-
-            clf = StrategyClassifier()
-            model_path = os.path.join(os.path.dirname(__file__), "..", "results", "strategy_classifier.pkl")
-            if os.path.exists(model_path):
-                clf.load(model_path)
-                prediction = clf.predict(ai_material, ai_instrument, ai_environment, ai_thermal_effect)
+            clf = get_classifier()
+            if clf is not None:
                 proba = clf.predict_proba(ai_material, ai_instrument, ai_environment, ai_thermal_effect)
+                prediction = max(proba, key=proba.get)
 
                 st.metric("Predicted Strategy", prediction)
 

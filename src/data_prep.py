@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 
 import boto3
+import pandas as pd
 from datasets import load_dataset
 from dotenv import load_dotenv
 from sklearn.model_selection import train_test_split
@@ -61,23 +62,32 @@ class DataPrepPipeline:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        records = []
-        for _, row in df.iterrows():
-            prompt = (
-                f"Instrument: {row.get('instrument', 'N/A')}\n"
-                f"Material: {row.get('material_name', 'N/A')}\n"
-                f"Environment: {row.get('environment_location', 'N/A')}\n"
-                f"Thermal Effect: {row.get('thermal_effect', 'N/A')}\n"
-                f"What thermal mitigation strategy should be used?"
-            )
-            completion = row.get("strategy_recommendation", row.get("strategy_type", ""))
-            records.append({"prompt": prompt, "completion": str(completion)})
+        def col(name):
+            """Return a string Series for a column, or 'N/A' if absent."""
+            if name in df.columns:
+                return df[name].fillna("N/A").astype(str)
+            return pd.Series("N/A", index=df.index)
+
+        prompts = (
+            "Instrument: " + col("instrument") + "\n"
+            + "Material: " + col("material_name") + "\n"
+            + "Environment: " + col("environment_location") + "\n"
+            + "Thermal Effect: " + col("thermal_effect") + "\n"
+            + "What thermal mitigation strategy should be used?"
+        )
+
+        if "strategy_recommendation" in df.columns:
+            completions = df["strategy_recommendation"].astype(str)
+        elif "strategy_type" in df.columns:
+            completions = df["strategy_type"].astype(str)
+        else:
+            completions = pd.Series("", index=df.index)
 
         with open(output_path, "w", encoding="utf-8") as f:
-            for record in records:
-                f.write(json.dumps(record) + "\n")
+            for prompt, completion in zip(prompts, completions):
+                f.write(json.dumps({"prompt": prompt, "completion": completion}) + "\n")
 
-        logger.info("Wrote %d records to %s", len(records), output_path)
+        logger.info("Wrote %d records to %s", len(df), output_path)
         return output_path
 
     def split_train_val(self, df, val_ratio=0.1):
