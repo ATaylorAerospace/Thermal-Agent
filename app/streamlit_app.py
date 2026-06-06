@@ -29,8 +29,10 @@ st.set_page_config(
 # --- Sidebar ---
 st.sidebar.title("Deep-Space Photonics Thermal Advisor")
 st.sidebar.markdown(
-    "A tool-using AWS Bedrock agent + physics simulator for recommending "
-    "thermal mitigation strategies in deep-space photonic instruments."
+    "A tool-using agent + physics simulator for recommending thermal "
+    "mitigation strategies in deep-space photonic instruments. The agent runs "
+    "on AWS Bedrock or a self-hosted fine-tuned open-weight model "
+    "(set `provider` in `config/agent_config.yaml`)."
 )
 st.sidebar.markdown(
     "[HuggingFace Dataset](https://huggingface.co/datasets/Taylor658/"

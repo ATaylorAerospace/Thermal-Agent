@@ -104,6 +104,23 @@ class ThermalAgent:
             logger.warning("Classifier model not found — classify tool will be unavailable")
 
         dispatcher = ToolDispatcher(classifier=classifier, datastore=datastore)
+
+        provider = agent_cfg.get("provider", "bedrock")
+        if provider == "local":
+            from src.backends import LocalToolBackend
+
+            local_cfg = config.get("local", {})
+            backend = LocalToolBackend(
+                model=local_cfg.get("model"),
+                base_url=local_cfg.get("base_url"),
+                api_key=local_cfg.get("api_key", "not-needed"),
+            )
+            return cls(
+                dispatcher=dispatcher,
+                model_id=local_cfg.get("model"),
+                client=backend,
+            )
+
         return cls(
             dispatcher=dispatcher,
             model_id=agent_cfg.get("model_id", DEFAULT_MODEL_ID),
