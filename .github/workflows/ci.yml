@@ -29,8 +29,5 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
 
-      - name: Run simulator tests
-        run: pytest tests/test_simulator.py -v
-
-      - name: Run classifier tests
-        run: pytest tests/test_classifier.py -v
+      - name: Run tests
+        run: pytest tests/ -v

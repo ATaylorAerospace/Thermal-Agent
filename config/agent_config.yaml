@@ -1,0 +1,18 @@
+# Thermal Advisor Agent Configuration
+# Author: A Taylor
+
+agent:
+  # Bedrock foundation model used for reasoning and tool use (no fine-tuning).
+  model_id: anthropic.claude-3-5-sonnet-20241022-v2:0
+  region: us-east-1
+  max_turns: 6
+
+datastore:
+  # Source dataset and the local vector index built from it.
+  dataset: Taylor658/deep-space-optical-chip-thermal-dataset
+  index_path: results/thermal_datastore.pkl
+  top_k: 3
+
+classifier:
+  # Trained XGBoost model exposed as the classify_strategy tool.
+  model_path: results/strategy_classifier.pkl

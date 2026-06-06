@@ -29,7 +29,7 @@ st.set_page_config(
 # --- Sidebar ---
 st.sidebar.title("Deep-Space Photonics Thermal Advisor")
 st.sidebar.markdown(
-    "Fine-tuned LLM on AWS Bedrock + physics simulator for recommending "
+    "A tool-using AWS Bedrock agent + physics simulator for recommending "
     "thermal mitigation strategies in deep-space photonic instruments."
 )
 st.sidebar.markdown(
@@ -37,15 +37,11 @@ st.sidebar.markdown(
     "deep-space-optical-chip-thermal-dataset)"
 )
 st.sidebar.markdown("---")
-bedrock_model_id = st.sidebar.text_input(
-    "Bedrock Model ID",
-    value="amazon.titan-text-express-v1",
-    help="Enter your fine-tuned model ARN or base model ID",
-)
 st.sidebar.info(
     "**Two Modes:**\n\n"
     "1. **Physics Simulator** — deterministic thermal drift calculations\n"
-    "2. **AI Thermal Advisor** — LLM + XGBoost strategy recommendations"
+    "2. **AI Thermal Advisor** — a Bedrock agent that calls the simulator, the "
+    "XGBoost classifier, and the scenario knowledge store"
 )
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Author: A Taylor**")
@@ -62,29 +58,18 @@ def get_simulator():
 
 
 @st.cache_resource
-def get_classifier():
-    """Load and cache the XGBoost strategy classifier, if available.
+def get_agent():
+    """Build and cache the ThermalAgent from the project config.
 
-    Returns the fitted StrategyClassifier, or None if the model file is missing.
+    Loads the data store index and classifier from disk if present; tools
+    backed by a missing artifact degrade gracefully.
     """
-    from src.strategy_classifier import StrategyClassifier
+    from src.agent import ThermalAgent
 
-    clf = StrategyClassifier()
-    model_path = os.path.join(
-        os.path.dirname(__file__), "..", "results", "strategy_classifier.pkl"
+    config_path = os.path.join(
+        os.path.dirname(__file__), "..", "config", "agent_config.yaml"
     )
-    if os.path.exists(model_path):
-        clf.load(model_path)
-        return clf
-    return None
-
-
-@st.cache_resource
-def get_bedrock_client(model_id):
-    """Return a cached Bedrock inference client for the given model id."""
-    from src.inference import BedrockInferenceClient
-
-    return BedrockInferenceClient(model_id=model_id)
+    return ThermalAgent.from_config(config_path)
 
 
 simulator = get_simulator()
@@ -145,6 +130,11 @@ with tab_sim:
 # --- AI Thermal Advisor Tab ---
 with tab_ai:
     st.header("AI Thermal Advisor")
+    st.caption(
+        "A Bedrock agent reasons over your scenario, calling the physics "
+        "simulator, the XGBoost classifier, and the scenario knowledge store "
+        "before recommending a strategy."
+    )
 
     instruments = [
         "Spectrometer",
@@ -178,50 +168,40 @@ with tab_ai:
                 "See .env.example for the required variables."
             )
         else:
+            query = (
+                f"Instrument: {ai_instrument}\n"
+                f"Material: {ai_material}\n"
+                f"Environment: {ai_environment}\n"
+                f"Thermal Effect: {ai_thermal_effect}\n"
+            )
+            if additional_context:
+                query += f"Additional Context: {additional_context}\n"
+            query += "What thermal mitigation strategy should be used and why?"
+
             try:
-                client = get_bedrock_client(bedrock_model_id)
-                prompt = client.build_thermal_prompt(
-                    ai_instrument, ai_material, ai_environment, ai_thermal_effect
-                )
-                if additional_context:
-                    prompt += f"\nAdditional Context: {additional_context}"
+                agent = get_agent()
+                with st.spinner("Agent reasoning and calling tools..."):
+                    result = agent.run(query)
 
-                st.subheader("AI Response")
-                response_container = st.empty()
-                full_response = ""
-                try:
-                    for token in client.stream_invoke(prompt):
-                        full_response += token
-                        response_container.markdown(full_response)
-                except Exception:
-                    # Fall back to synchronous invocation
-                    full_response = client.invoke(prompt)
-                    response_container.markdown(full_response)
+                st.subheader("Recommendation")
+                st.markdown(result["answer"])
+
+                if result["tool_calls"]:
+                    st.subheader("Tools the agent used")
+                    for call in result["tool_calls"]:
+                        with st.expander(f"\U0001f6e0️ {call['name']}"):
+                            st.write("**Input:**", call["input"])
+                            res = call["result"]
+                            if call["name"] == "classify_strategy" and "probabilities" in res:
+                                proba = res["probabilities"]
+                                fig_proba = px.bar(
+                                    x=list(proba.keys()),
+                                    y=list(proba.values()),
+                                    labels={"x": "Strategy", "y": "Probability"},
+                                    title="Strategy Probability Distribution",
+                                    color=list(proba.keys()),
+                                )
+                                st.plotly_chart(fig_proba, use_container_width=True)
+                            st.json(res)
             except Exception as e:
-                st.error(f"Bedrock invocation failed: {e}")
-
-        # XGBoost classifier prediction
-        st.subheader("XGBoost Strategy Classifier")
-        try:
-            clf = get_classifier()
-            if clf is not None:
-                proba = clf.predict_proba(ai_material, ai_instrument, ai_environment, ai_thermal_effect)
-                prediction = max(proba, key=proba.get)
-
-                st.metric("Predicted Strategy", prediction)
-
-                fig_proba = px.bar(
-                    x=list(proba.keys()),
-                    y=list(proba.values()),
-                    labels={"x": "Strategy", "y": "Probability"},
-                    title="Strategy Probability Distribution",
-                    color=list(proba.keys()),
-                )
-                st.plotly_chart(fig_proba, use_container_width=True)
-            else:
-                st.info(
-                    "XGBoost model not found. Run `python src/strategy_classifier.py` "
-                    "to train the classifier first."
-                )
-        except Exception as e:
-            st.warning(f"Classifier unavailable: {e}")
+                st.error(f"Agent run failed: {e}")
