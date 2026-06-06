@@ -54,8 +54,29 @@ def _simulate_result(row):
     return {"error": "Unknown material or environment for simulator."}
 
 
-def _classify_result(row):
-    """Synthesize a classifier result biased toward the labeled strategy."""
+def _classify_result(row, classifier=None):
+    """Return classifier result; falls back to synthesized if classifier unavailable.
+
+    Args:
+        row: Scenario row mapping.
+        classifier: Optional fitted StrategyClassifier instance.
+
+    Returns:
+        Dict with 'predicted_strategy' and 'probabilities'.
+    """
+    if classifier is not None:
+        try:
+            proba = classifier.predict_proba(
+                row.get("material_name"),
+                row.get("instrument"),
+                row.get("environment_location"),
+                row.get("thermal_effect"),
+            )
+            predicted = max(proba, key=proba.get)
+            return {"predicted_strategy": predicted, "probabilities": proba}
+        except Exception as exc:
+            logger.debug("Classifier inference failed (%s); using synthesized fallback", exc)
+    # Synthesized fallback — biased toward the labeled strategy.
     strategies = ["Passive", "Active", "Hybrid"]
     true_strategy = row.get("strategy_type", "Hybrid")
     if true_strategy not in strategies:
@@ -65,8 +86,27 @@ def _classify_result(row):
     return {"predicted_strategy": true_strategy, "probabilities": proba}
 
 
-def _search_result(row):
-    """Synthesize a retrieved-scenario result derived from the row."""
+def _search_result(row, datastore=None):
+    """Return retrieved scenarios; falls back to synthesized if datastore unavailable.
+
+    Args:
+        row: Scenario row mapping.
+        datastore: Optional built ThermalDataStore instance.
+
+    Returns:
+        Dict with 'scenarios' list.
+    """
+    if datastore is not None:
+        try:
+            query_text = (
+                f"{row.get('material_name')} {row.get('instrument')} "
+                f"{row.get('environment_location')} {row.get('thermal_effect')}"
+            )
+            scenarios = datastore.query(query_text, top_k=1)
+            return {"scenarios": scenarios}
+        except Exception as exc:
+            logger.debug("Data store query failed (%s); using synthesized fallback", exc)
+    # Synthesized fallback — single scenario derived from the row itself.
     scenario = {k: row.get(k) for k in
                 ("instrument", "material_name", "environment_location", "thermal_effect")}
     scenario["strategy_type"] = row.get("strategy_type")
@@ -89,18 +129,64 @@ def _final_answer(row, sim_result):
     )
 
 
-def build_example(row):
+def _load_or_train_classifier(df, path):
+    """Load classifier from disk or train on df when path is absent.
+
+    Args:
+        df: Full scenario DataFrame (used for on-the-fly training only).
+        path: Expected file path for the persisted classifier.
+
+    Returns:
+        A fitted StrategyClassifier.
+    """
+    from src.strategy_classifier import StrategyClassifier  # lazy — avoids heavy import at module level
+
+    clf = StrategyClassifier()
+    if Path(path).exists():
+        logger.info("Loading classifier from %s", path)
+        clf.load(path)
+    else:
+        logger.info("No classifier at %s — training on dataset (%d rows)", path, len(df))
+        clf.train(df)
+    return clf
+
+
+def _load_or_build_datastore(df, path):
+    """Load data store from disk or build from df when path is absent.
+
+    Args:
+        df: Full scenario DataFrame (used for on-the-fly building only).
+        path: Expected file path for the persisted data store.
+
+    Returns:
+        A built ThermalDataStore.
+    """
+    from src.datastore import ThermalDataStore  # lazy — avoids heavy import at module level
+
+    store = ThermalDataStore()
+    if Path(path).exists():
+        logger.info("Loading data store from %s", path)
+        store.load(path)
+    else:
+        logger.info("No data store at %s — building from dataset (%d rows)", path, len(df))
+        store.build(df)
+    return store
+
+
+def build_example(row, classifier=None, datastore=None):
     """Build a single SFT example (messages + tools) for a dataset row.
 
     Args:
         row: A mapping with scenario fields and a labeled strategy.
+        classifier: Optional fitted StrategyClassifier for real classify_strategy results.
+        datastore: Optional built ThermalDataStore for real search_thermal_knowledge results.
 
     Returns:
         Dict with 'messages' (OpenAI chat format) and 'tools'.
     """
     sim_result = _simulate_result(row)
-    classify_result = _classify_result(row)
-    search_result = _search_result(row)
+    classify_res = _classify_result(row, classifier=classifier)
+    search_res = _search_result(row, datastore=datastore)
 
     tool_calls = [
         {
@@ -148,27 +234,32 @@ def build_example(row):
         {"role": "tool", "tool_call_id": "call_sim",
          "content": json.dumps(sim_result)},
         {"role": "tool", "tool_call_id": "call_clf",
-         "content": json.dumps(classify_result)},
+         "content": json.dumps(classify_res)},
         {"role": "tool", "tool_call_id": "call_kb",
-         "content": json.dumps(search_result)},
+         "content": json.dumps(search_res)},
         {"role": "assistant", "content": _final_answer(row, sim_result)},
     ]
     return {"messages": messages, "tools": OPENAI_TOOLS}
 
 
-def build_examples(df, limit=None):
+def build_examples(df, limit=None, classifier=None, datastore=None):
     """Build SFT examples for a DataFrame of scenarios.
 
     Args:
         df: DataFrame of scenario rows.
         limit: Optional cap on the number of examples.
+        classifier: Optional fitted StrategyClassifier.
+        datastore: Optional built ThermalDataStore.
 
     Returns:
         List of example dicts.
     """
     if limit is not None:
         df = df.head(limit)
-    examples = [build_example(row) for row in df.to_dict(orient="records")]
+    examples = [
+        build_example(row, classifier=classifier, datastore=datastore)
+        for row in df.to_dict(orient="records")
+    ]
     logger.info("Built %d SFT examples", len(examples))
     return examples
 
@@ -192,14 +283,27 @@ def write_jsonl(examples, path):
     return path
 
 
-def run(output_dir="data/finetune", val_ratio=0.1, limit=None, dataset_name=None):
+def run(
+    output_dir="data/finetune",
+    val_ratio=0.1,
+    limit=None,
+    dataset_name=None,
+    classifier_path=None,
+    index_path=None,
+):
     """Build train/validation SFT JSONL from the HuggingFace dataset.
+
+    Loads (or trains on-the-fly) a StrategyClassifier and (or builds on-the-fly)
+    a ThermalDataStore so that tool-result messages contain real model outputs
+    rather than synthesized proxies.
 
     Args:
         output_dir: Directory for the output JSONL files.
         val_ratio: Validation split fraction.
         limit: Optional cap on rows processed.
         dataset_name: HuggingFace dataset id (defaults to env/project default).
+        classifier_path: Path to a saved StrategyClassifier pickle.
+        index_path: Path to a saved ThermalDataStore pickle.
     """
     from datasets import load_dataset  # optional/heavy dependency
 
@@ -211,14 +315,26 @@ def run(output_dir="data/finetune", val_ratio=0.1, limit=None, dataset_name=None
     if limit is not None:
         df = df.head(limit)
 
+    clf_path = classifier_path or os.getenv("CLASSIFIER_PATH", "results/strategy_classifier.pkl")
+    ds_path = index_path or os.getenv("INDEX_PATH", "results/thermal_datastore.pkl")
+
+    classifier = _load_or_train_classifier(df, clf_path)
+    datastore = _load_or_build_datastore(df, ds_path)
+
     stratify = df["strategy_type"] if "strategy_type" in df.columns else None
     train_df, val_df = train_test_split(
         df, test_size=val_ratio, random_state=42, stratify=stratify
     )
 
     output_dir = Path(output_dir)
-    write_jsonl(build_examples(train_df), output_dir / "train.jsonl")
-    write_jsonl(build_examples(val_df), output_dir / "validation.jsonl")
+    write_jsonl(
+        build_examples(train_df, classifier=classifier, datastore=datastore),
+        output_dir / "train.jsonl",
+    )
+    write_jsonl(
+        build_examples(val_df, classifier=classifier, datastore=datastore),
+        output_dir / "validation.jsonl",
+    )
     logger.info("Training data preparation complete")
 
 
@@ -230,6 +346,10 @@ if __name__ == "__main__":
     parser.add_argument("--val_ratio", type=float, default=0.1)
     parser.add_argument("--limit", type=int, default=None, help="Cap rows (for quick runs)")
     parser.add_argument("--dataset", type=str, default=None)
+    parser.add_argument("--classifier_path", type=str, default=None,
+                        help="Path to saved StrategyClassifier pickle")
+    parser.add_argument("--index_path", type=str, default=None,
+                        help="Path to saved ThermalDataStore pickle")
     args = parser.parse_args()
 
     run(
@@ -237,4 +357,6 @@ if __name__ == "__main__":
         val_ratio=args.val_ratio,
         limit=args.limit,
         dataset_name=args.dataset,
+        classifier_path=args.classifier_path,
+        index_path=args.index_path,
     )
