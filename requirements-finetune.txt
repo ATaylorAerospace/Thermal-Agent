@@ -1,0 +1,11 @@
+# Heavy, optional dependencies for open-weight fine-tuning (QLoRA + GGUF).
+# Install on a GPU host:  pip install -r requirements-finetune.txt
+# The core requirements.txt is enough to run the Bedrock agent and the tests.
+
+torch>=2.3.0
+transformers>=4.45.0
+peft>=0.13.0
+trl>=0.11.0
+bitsandbytes>=0.44.0
+accelerate>=1.0.0
+sentencepiece>=0.2.0

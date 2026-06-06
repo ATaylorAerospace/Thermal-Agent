@@ -2,10 +2,20 @@
 # Author: A Taylor
 
 agent:
-  # Bedrock foundation model used for reasoning and tool use (no fine-tuning).
+  # Backend provider: "bedrock" (managed) or "local" (self-hosted open-weight).
+  provider: bedrock
+  # Bedrock foundation model used when provider is "bedrock".
   model_id: anthropic.claude-3-5-sonnet-20241022-v2:0
   region: us-east-1
   max_turns: 6
+
+# Self-hosted fine-tuned open-weight model, used when provider is "local".
+# Serve your QLoRA-tuned GGUF model behind an OpenAI-compatible endpoint
+# (llama.cpp server, Ollama, or vLLM) and point to it here.
+local:
+  model: thermal-agent
+  base_url: http://localhost:8000/v1
+  api_key: not-needed
 
 datastore:
   # Source dataset and the local vector index built from it.

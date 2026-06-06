@@ -14,14 +14,22 @@ cd Thermal-Agent
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install dependencies
+# Install dependencies (core: agent + tests)
 pip install -r requirements.txt
 pip install pytest
+
+# Optional: heavy open-weight fine-tuning stack (GPU host only)
+# pip install -r requirements-finetune.txt
 
 # Configure environment
 cp .env.example .env
 # Edit .env with your AWS credentials (optional — only needed for Bedrock features)
 ```
+
+> The core `requirements.txt` is enough to run the agent and the full test
+> suite. The QLoRA + GGUF fine-tuning modules (`src/finetune.py`,
+> `src/quantize.py`) need `requirements-finetune.txt` and a GPU; their heavy
+> dependencies are imported lazily so the rest of the project stays light.
 
 ## Running Tests
 
@@ -54,13 +62,13 @@ pytest tests/test_classifier.py -v
 
 | Directory | Purpose |
 |-----------|---------|
-| `src/` | Core library code (agent, tools, data store, simulator, classifier) |
+| `src/` | Core library code (agent, backends, tools, data store, simulator, classifier, fine-tuning) |
 | `app/` | Streamlit web application |
 | `tests/` | Pytest test suites |
-| `config/` | YAML configuration files (agent config) |
-| `notebooks/` | Jupyter notebooks for EDA and the agent walkthrough |
-| `scripts/` | Shell scripts for building knowledge artifacts |
-| `results/` | Model & index artifacts (gitignored) |
+| `config/` | YAML configuration files (agent + fine-tuning) |
+| `notebooks/` | Jupyter notebooks for EDA, the agent, and fine-tuning |
+| `scripts/` | Shell scripts for building artifacts and fine-tuning |
+| `results/` | Model, index & adapter artifacts (gitignored) |
 
 ## Questions?
 
