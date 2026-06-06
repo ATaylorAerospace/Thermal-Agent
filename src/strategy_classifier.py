@@ -10,7 +10,6 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-from datasets import load_dataset
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -197,6 +196,8 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, default="Taylor658/deep-space-optical-chip-thermal-dataset")
     parser.add_argument("--save_path", type=str, default="results/strategy_classifier.pkl")
     args = parser.parse_args()
+
+    from datasets import load_dataset  # optional/heavy dependency
 
     logger.info("Loading dataset: %s", args.dataset)
     ds = load_dataset(args.dataset, split="train")

@@ -4,16 +4,16 @@
 
 [![CI](https://github.com/ATaylorAerospace/Thermal-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/ATaylorAerospace/Thermal-Agent/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
+[![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock%20Agent-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
 [![HuggingFace Dataset — 40K rows](https://img.shields.io/badge/HuggingFace-40K%20rows-FFD21E?logo=huggingface&logoColor=black)](https://huggingface.co/datasets/Taylor658/deep-space-optical-chip-thermal-dataset)
 [![Streamlit](https://img.shields.io/badge/Streamlit-Demo-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![XGBoost](https://img.shields.io/badge/XGBoost-Classifier-blue)](https://xgboost.readthedocs.io/)
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 [![Contact A Taylor](https://img.shields.io/badge/Contact-A%20Taylor-brightgreen?logo=mail.ru&logoColor=white)](https://ataylor.getform.com/5w8wz)
 
-> **Fine tuned LLM on AWS Bedrock + physics simulator for recommending thermal mitigation strategies in deep space photonic instruments**
+> **A tool-using AWS Bedrock agent + physics simulator for recommending thermal mitigation strategies in deep space photonic instruments**
 
-*Physics simulation · Bedrock fine tuning · XGBoost classification · Streamlit demo*
+*Physics simulation · Agentic tool use · Scenario retrieval · XGBoost classification · Streamlit demo*
 
 ---
 
@@ -31,15 +31,22 @@ A spectrometer on a Jovian probe faces **180 K temperature swings**. An optical 
 
 ## ✨ The Solution
 
-This project combines **deterministic physics** with **AI-driven recommendations** to prescribe optimal thermal mitigation strategies for any instrument-material-environment combination:
+This project pairs **deterministic physics** with an **agent that reasons over a knowledge data store** — no fine-tuning required. A Bedrock foundation model decides which tools to call for any instrument-material-environment combination, then synthesizes a grounded recommendation:
 
 | Layer | What It Does | Status |
 |-------|-------------|--------|
 | 🔬 **Physics Simulator** | Computes Δn and strain from first principles | ✅ Live |
-| 🤖 **Bedrock Fine-Tuned LLM** | Generates detailed strategy recommendations trained on 40K scenarios | ✅ Live |
+| 🤖 **Bedrock Agent** | Reasons over the scenario and calls tools via the Converse API | ✅ Live |
+| 📚 **Scenario Data Store** | Retrieves similar prior cases from the 40K-scenario knowledge base | ✅ Live |
 | 📊 **XGBoost Classifier** | Fast Passive / Active / Hybrid prediction with calibrated probabilities | ✅ Live |
-| 🖥️ **Streamlit App** | Interactive two-mode demo (physics + AI advisor) | ✅ Live |
+| 🖥️ **Streamlit App** | Interactive two-mode demo (physics + agentic advisor) | ✅ Live |
 | 🧪 **CI Pipeline** | Automated pytest across Python 3.10–3.12 on every push and PR | ✅ Live |
+
+### Why an agent instead of a fine-tuned model?
+
+- **No training job** — point the agent at a data store and it works; updating knowledge means re-indexing, not re-training.
+- **Grounded answers** — every recommendation cites real simulator output, classifier probabilities, and retrieved scenarios rather than memorized weights.
+- **Composable** — the simulator, classifier, and data store are independent tools the model orchestrates on demand.
 
 ---
 
@@ -48,25 +55,31 @@ This project combines **deterministic physics** with **AI-driven recommendations
 ```
 ┌─────────────────────────────────────────────────────┐
 │              Streamlit Interactive App               │
-│         (Physics Simulator  ·  AI Advisor)          │
-├──────────────────────┬──────────────────────────────┤
-│   ThermalDriftSim    │    BedrockInferenceClient    │
-│   Δn = dn/dT × ΔT   │    Fine-tuned Titan Express  │
-│   ε  = α × ΔT       │    + streaming responses      │
-├──────────────────────┼──────────────────────────────┤
-│  XGBoost Classifier  │    DataPrepPipeline          │
-│  P(Passive|Active|   │    HuggingFace → JSONL → S3  │
-│    Hybrid)           │                               │
-├──────────────────────┴──────────────────────────────┤
-│           AWS Bedrock  ·  S3  ·  IAM                │
-└─────────────────────────────────────────────────────┘
+│        (Physics Simulator  ·  Agentic Advisor)       │
+├──────────────────────────────────────────────────────┤
+│                    ThermalAgent                      │
+│         Bedrock Converse API  ·  tool-use loop       │
+├───────────────┬──────────────────┬───────────────────┤
+│  simulate_    │  classify_       │  search_thermal_   │
+│  thermal_     │  strategy        │  knowledge         │
+│  drift        │  (XGBoost)       │  (data store)      │
+├───────────────┴──────────────────┴───────────────────┤
+│   ThermalDriftSim   ·   StrategyClassifier   ·        │
+│   ThermalDataStore (TF-IDF retrieval over 40K rows)  │
+├──────────────────────────────────────────────────────┤
+│        AWS Bedrock (foundation model)  ·  IAM        │
+└──────────────────────────────────────────────────────┘
 ```
+
+The agent runs a **Converse-API tool-use loop**: the model requests a tool, the `ToolDispatcher` executes it, the result is fed back, and the loop repeats until the model returns a final recommendation. The data store is backend-agnostic — the local TF-IDF index can be swapped for **Amazon Bedrock Knowledge Bases** in production without changing the agent or tools.
 
 ---
 
 ## 📦 Dataset
 
 **40,000 synthetic thermal scenarios** — [Taylor658/deep-space-optical-chip-thermal-dataset](https://huggingface.co/datasets/Taylor658/deep-space-optical-chip-thermal-dataset)
+
+The dataset is the agent's **knowledge store**: scenarios are indexed for retrieval and used to train the XGBoost classifier.
 
 ### Chip Materials
 
@@ -105,13 +118,12 @@ pip install -r requirements.txt
 
 # Configure
 cp .env.example .env
-# → Edit .env with your AWS credentials and S3 bucket
+# → Edit .env with your AWS credentials (Bedrock access)
 
-# Prepare dataset & upload to S3
-python src/data_prep.py --output_dir data/ --upload_to_s3
-
-# Launch fine-tuning job
-python src/bedrock_finetune.py --config config/bedrock_config.yaml --action start
+# Build the agent's knowledge artifacts:
+#   - scenario data store (vector index)
+#   - XGBoost strategy classifier
+bash scripts/build_index.sh
 
 # Run the interactive app
 streamlit run app/streamlit_app.py
@@ -137,23 +149,15 @@ print(f"Risk: {result['risk']}")              # Risk: Critical
 print(f"Strategy: {result['recommended_strategy_hint']}")  # Strategy: Hybrid
 ```
 
-### 2. Compare All Materials for a Given Environment
+### 2. Scenario Retrieval — Query the Data Store
 
 ```python
-from src.simulator import ThermalDriftSimulator
+from src.datastore import ThermalDataStore
 
-sim = ThermalDriftSimulator()
+store = ThermalDataStore.from_huggingface()  # or .load("results/thermal_datastore.pkl")
 
-for material in sim.get_all_materials():
-    r = sim.evaluate(material, "Outer Solar System")
-    print(f"{material:20s}  Δn={r['delta_n']:.6f}  ε={r['strain']:.2e}  → {r['risk']}")
-```
-
-```
-Silicon               Δn=0.044640  ε=6.24e-04  → Critical
-Silicon Nitride       Δn=0.005880  ε=1.92e-04  → Moderate
-Polymer               Δn=0.026400  ε=5.28e-04  → Critical
-Indium Phosphide      Δn=0.081600  ε=1.10e-03  → Critical
+for hit in store.query("Indium Phosphide spectrometer Jovian spectral drift", top_k=3):
+    print(f"{hit['similarity']:.3f}  {hit['instrument']} → {hit.get('strategy_type')}")
 ```
 
 ### 3. XGBoost Strategy Prediction
@@ -164,7 +168,6 @@ from src.strategy_classifier import StrategyClassifier
 clf = StrategyClassifier()
 clf.load("results/strategy_classifier.pkl")
 
-# Predict with calibrated probabilities
 proba = clf.predict_proba(
     material="Silicon",
     instrument="Spectrometer",
@@ -175,30 +178,31 @@ print(proba)
 # {'Active': 0.12, 'Hybrid': 0.61, 'Passive': 0.27}
 ```
 
-### 4. Bedrock Inference — AI Thermal Advisor
+### 4. The Agent — Tool-Grounded Recommendation
 
 ```python
-from src.inference import BedrockInferenceClient
+from src.agent import ThermalAgent
 
-client = BedrockInferenceClient(model_id="your-fine-tuned-model-arn")
+# Loads the data store and classifier from config/agent_config.yaml if present
+agent = ThermalAgent.from_config()
 
-prompt = client.build_thermal_prompt(
-    instrument="Laser Communication Terminal",
-    material="Indium Phosphide",
-    environment="Outer Solar System",
-    thermal_effect="Waveguide Misalignment",
+result = agent.run(
+    "Instrument: Laser Communication Terminal\n"
+    "Material: Indium Phosphide\n"
+    "Environment: Outer Solar System\n"
+    "Thermal Effect: Waveguide Misalignment\n"
+    "What thermal mitigation strategy should be used and why?"
 )
 
-# Stream the response
-for token in client.stream_invoke(prompt):
-    print(token, end="", flush=True)
+print(result["answer"])        # the grounded recommendation
+print(result["tool_calls"])    # every tool the agent invoked, with inputs + results
 ```
 
-### 5. Run the Full Pipeline
+### 5. Build the Knowledge Artifacts
 
 ```bash
-# One command — prepare data, launch fine-tuning, poll until complete
-bash scripts/run_pipeline.sh
+# One command — build the data store index and train the classifier
+bash scripts/build_index.sh
 ```
 
 ---
@@ -213,24 +217,27 @@ Thermal-Agent/
 ├── app/
 │   └── streamlit_app.py             # Interactive two-tab demo
 ├── config/
-│   └── bedrock_config.yaml          # Bedrock hyperparameters & S3 paths
+│   └── agent_config.yaml            # Agent model, data store, and classifier paths
 ├── docs/
 │   └── thermals.png                 # Hero banner image
 ├── notebooks/
 │   ├── 01_eda.ipynb                 # Exploratory data analysis
-│   └── 02_bedrock_fine_tuning.ipynb # End-to-end fine-tuning walkthrough
-├── results/                         # Model artifacts & evaluation outputs
+│   └── 02_agent_walkthrough.ipynb   # End-to-end agent walkthrough
+├── results/                         # Model & index artifacts (gitignored)
 ├── scripts/
-│   └── run_pipeline.sh              # Full pipeline runner
+│   └── build_index.sh               # Build data store + train classifier
 ├── src/
 │   ├── __init__.py                  # Public API exports
-│   ├── bedrock_finetune.py          # Bedrock job lifecycle manager
-│   ├── data_prep.py                 # HuggingFace → Bedrock JSONL → S3
-│   ├── inference.py                 # Base + fine-tuned model inference
+│   ├── agent.py                     # Bedrock Converse tool-use agent
+│   ├── tools.py                     # Tool specs + dispatcher
+│   ├── datastore.py                 # Scenario retrieval (knowledge store)
 │   ├── simulator.py                 # Physics-based thermal drift engine
 │   └── strategy_classifier.py       # XGBoost Passive/Active/Hybrid
 ├── tests/
 │   ├── __init__.py                  # Test package init
+│   ├── test_agent.py                # Agent loop tests (mocked Bedrock)
+│   ├── test_tools.py                # Tool dispatch tests
+│   ├── test_datastore.py            # Data store retrieval tests
 │   ├── test_classifier.py           # Classifier tests
 │   └── test_simulator.py            # Physics simulator tests
 ├── .env.example                     # AWS credential template
@@ -246,19 +253,19 @@ Thermal-Agent/
 ## 🧩 Components
 
 ### 🔬 Physics Simulator (`src/simulator.py`)
-Computes **refractive index shift** (Δn = dn/dT × ΔT) and **mechanical strain** (ε = α × ΔT) for any material-environment pair. Classifies risk as **Low → Moderate → High → Critical** and maps to a strategy hint. Fully type-annotated for IDE support.
+Computes **refractive index shift** (Δn = dn/dT × ΔT) and **mechanical strain** (ε = α × ΔT) for any material-environment pair. Classifies risk as **Low → Moderate → High → Critical** and maps to a strategy hint. Exposed to the agent as the `simulate_thermal_drift` tool.
 
-### 📋 Data Preparation (`src/data_prep.py`)
-Loads the HuggingFace dataset, converts to Bedrock-compatible `{"prompt": ..., "completion": ...}` JSONL, performs stratified train/validation splitting, and uploads to S3.
+### 📚 Scenario Data Store (`src/datastore.py`)
+Indexes the 40K HuggingFace scenarios with TF-IDF and retrieves the most similar prior cases by cosine similarity. Backend-agnostic — swappable for Amazon Bedrock Knowledge Bases in production. Exposed as the `search_thermal_knowledge` tool.
 
-### ⚙️ Bedrock Fine-Tune Manager (`src/bedrock_finetune.py`)
-Full lifecycle management — **start**, **monitor**, **cancel**, and **list** fine-tuning jobs on Amazon Titan Text Express.
+### 🛠️ Agent Tools (`src/tools.py`)
+Bedrock Converse tool specifications plus a `ToolDispatcher` that routes each tool call to the simulator, classifier, or data store. Tools backed by a missing artifact degrade gracefully.
 
-### 🤖 Inference Client (`src/inference.py`)
-Synchronous and **streaming** inference against base and fine-tuned Bedrock models. Both `invoke()` and `stream_invoke()` accept configurable `max_tokens` and `temperature` parameters. Includes a structured prompt builder matching the training format and a side-by-side model comparison utility.
+### 🤖 Thermal Agent (`src/agent.py`)
+A tool-using agent built on the Bedrock **Converse API**. It runs a reason-act loop — requesting tools, feeding results back, and iterating — until it returns a grounded recommendation along with the full trace of tool calls.
 
 ### 📊 Strategy Classifier (`src/strategy_classifier.py`)
-XGBoost classifier predicting **Passive / Active / Hybrid** strategies with calibrated probability estimates. Includes fitted-state validation to prevent silent failures. Fast fallback when Bedrock is unavailable.
+XGBoost classifier predicting **Passive / Active / Hybrid** strategies with calibrated probability estimates. Exposed as the `classify_strategy` tool and usable standalone.
 
 ---
 
@@ -270,12 +277,11 @@ Tests run automatically via **GitHub Actions CI** on every push and pull request
 # Run all tests locally
 pytest tests/ -v
 
-# Run simulator tests only
-pytest tests/test_simulator.py -v
-
-# Run classifier tests only
-pytest tests/test_classifier.py -v
+# Run a single suite
+pytest tests/test_agent.py -v
 ```
+
+The agent tests use a scripted fake Bedrock client, so the full tool-use loop is exercised **without any AWS calls**.
 
 ---
 
@@ -298,4 +304,3 @@ Copyright (c) 2026 A Taylor
 Have questions, ideas, or want to collaborate? Reach out directly:
 
 [![Contact A Taylor](https://img.shields.io/badge/Contact-A%20Taylor-brightgreen?logo=mail.ru&logoColor=white)](https://ataylor.getform.com/5w8wz)
-

@@ -54,13 +54,13 @@ pytest tests/test_classifier.py -v
 
 | Directory | Purpose |
 |-----------|---------|
-| `src/` | Core library code |
+| `src/` | Core library code (agent, tools, data store, simulator, classifier) |
 | `app/` | Streamlit web application |
 | `tests/` | Pytest test suites |
-| `config/` | YAML configuration files |
-| `notebooks/` | Jupyter notebooks for EDA and fine-tuning |
-| `scripts/` | Shell scripts for pipeline automation |
-| `results/` | Model artifacts and output files (gitignored) |
+| `config/` | YAML configuration files (agent config) |
+| `notebooks/` | Jupyter notebooks for EDA and the agent walkthrough |
+| `scripts/` | Shell scripts for building knowledge artifacts |
+| `results/` | Model & index artifacts (gitignored) |
 
 ## Questions?
 
