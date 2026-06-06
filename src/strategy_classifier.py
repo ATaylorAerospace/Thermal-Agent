@@ -37,7 +37,6 @@ class StrategyClassifier:
             n_estimators=200,
             max_depth=6,
             learning_rate=0.1,
-            use_label_encoder=False,
             eval_metric="mlogloss",
         )
         self.encoders = {col: LabelEncoder() for col in self.FEATURE_COLS}
