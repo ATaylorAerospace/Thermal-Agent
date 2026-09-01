@@ -74,6 +74,22 @@ def get_agent():
     return ThermalAgent.from_config(config_path)
 
 
+@st.cache_resource
+def get_agent_provider():
+    """Return the configured agent provider ('bedrock' or 'local')."""
+    import yaml
+
+    config_path = os.path.join(
+        os.path.dirname(__file__), "..", "config", "agent_config.yaml"
+    )
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f) or {}
+    except OSError:
+        return "bedrock"
+    return config.get("agent", {}).get("provider", "bedrock")
+
+
 simulator = get_simulator()
 materials = simulator.get_all_materials()
 environments = simulator.get_all_environments()
@@ -162,12 +178,14 @@ with tab_ai:
     additional_context = st.text_area("Additional Context (optional)", "", key="ai_ctx")
 
     if st.button("Get AI Recommendation", key="run_ai"):
-        # Check AWS credentials
-        if not os.getenv("AWS_ACCESS_KEY_ID"):
+        # AWS credentials are only required for the managed Bedrock backend;
+        # the local (self-hosted fine-tuned model) provider needs none.
+        if get_agent_provider() == "bedrock" and not os.getenv("AWS_ACCESS_KEY_ID"):
             st.warning(
                 "AWS credentials not configured. Please set AWS_ACCESS_KEY_ID, "
-                "AWS_SECRET_ACCESS_KEY, and AWS_REGION in your .env file. "
-                "See .env.example for the required variables."
+                "AWS_SECRET_ACCESS_KEY, and AWS_REGION in your .env file "
+                "(see .env.example), or switch to `provider: local` in "
+                "config/agent_config.yaml to use a self-hosted model."
             )
         else:
             query = (

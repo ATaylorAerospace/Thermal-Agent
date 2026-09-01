@@ -94,3 +94,89 @@ class TestThermalAgent:
         """_extract_text should be robust to empty messages."""
         assert ThermalAgent._extract_text({}) == ""
         assert ThermalAgent._extract_text({"content": []}) == ""
+
+
+class AlwaysToolUseClient:
+    """Fake client that requests a tool on every turn (never finishes)."""
+
+    def converse(self, modelId, messages, system, toolConfig):
+        return {
+            "stopReason": "tool_use",
+            "output": {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"text": "Still analyzing the scenario."},
+                        {
+                            "toolUse": {
+                                "toolUseId": "t1",
+                                "name": "simulate_thermal_drift",
+                                "input": {
+                                    "material": "Silicon",
+                                    "environment": "Mars Transit",
+                                },
+                            }
+                        },
+                    ],
+                }
+            },
+        }
+
+
+class TestTurnBudget:
+    """Turn-budget behavior. Author: A Taylor."""
+
+    def test_exhausted_budget_returns_last_assistant_text(self):
+        """When turns run out, the answer must come from the last assistant
+        message, not the trailing tool-results user message."""
+        agent = ThermalAgent(dispatcher=ToolDispatcher(), client=AlwaysToolUseClient())
+        result = agent.run("Evaluate Silicon on Mars Transit", max_turns=2)
+        assert result["answer"] == "Still analyzing the scenario."
+        assert len(result["tool_calls"]) == 2
+
+    def test_constructor_max_turns_is_default(self):
+        """run() should use the agent's configured max_turns by default."""
+        agent = ThermalAgent(
+            dispatcher=ToolDispatcher(), client=AlwaysToolUseClient(), max_turns=3
+        )
+        result = agent.run("Evaluate Silicon on Mars Transit")
+        assert len(result["tool_calls"]) == 3
+
+
+class TestFromConfig:
+    """from_config wiring. Author: A Taylor."""
+
+    def test_bedrock_env_model_override_and_max_turns(self, tmp_path, monkeypatch):
+        """BEDROCK_AGENT_MODEL_ID should override the YAML model id, and
+        agent.max_turns should be read from the config."""
+        config = tmp_path / "agent.yaml"
+        config.write_text(
+            "agent:\n"
+            "  provider: bedrock\n"
+            "  model_id: from-yaml\n"
+            "  region: us-east-1\n"
+            "  max_turns: 4\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("BEDROCK_AGENT_MODEL_ID", "from-env")
+        agent = ThermalAgent.from_config(str(config))
+        assert agent.model_id == "from-env"
+        assert agent.max_turns == 4
+
+    def test_local_provider_env_overrides(self, tmp_path, monkeypatch):
+        """LOCAL_MODEL_* env vars should override the YAML local section."""
+        from src.backends import LocalToolBackend
+
+        config = tmp_path / "agent.yaml"
+        config.write_text(
+            "agent:\n"
+            "  provider: local\n"
+            "local:\n"
+            "  model: yaml-model\n"
+            "  base_url: http://localhost:8000/v1\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("LOCAL_MODEL_NAME", "env-model")
+        agent = ThermalAgent.from_config(str(config))
+        assert isinstance(agent.client, LocalToolBackend)
+        assert agent.model_id == "env-model"
