@@ -156,7 +156,8 @@ pip install -r requirements.txt
 
 # Configure
 cp .env.example .env
-# → Edit .env with your AWS credentials (Bedrock access)
+# → Edit .env with your AWS credentials (only needed for the Bedrock provider —
+#   the local self-hosted provider requires none)
 
 # Build the agent's knowledge artifacts:
 #   - scenario data store (vector index)
@@ -283,7 +284,16 @@ local:
   base_url: http://localhost:8000/v1
 ```
 
-`ThermalAgent.from_config()` now routes through `LocalToolBackend` — the rest of the agent loop is unchanged.
+`ThermalAgent.from_config()` now routes through `LocalToolBackend` — the rest of the agent loop is unchanged, and the Streamlit app runs the local provider **without any AWS credentials**.
+
+Deployments can also retarget the agent without editing YAML — environment variables (see [`.env.example`](.env.example)) override the config values:
+
+| Variable | Overrides |
+|----------|-----------|
+| `BEDROCK_AGENT_MODEL_ID` | `agent.model_id` (Bedrock provider) |
+| `LOCAL_MODEL_NAME` | `local.model` |
+| `LOCAL_MODEL_BASE_URL` | `local.base_url` |
+| `LOCAL_MODEL_API_KEY` | `local.api_key` |
 
 ---
 
@@ -352,7 +362,7 @@ Indexes the 40K HuggingFace scenarios with TF-IDF and retrieves the most similar
 Bedrock Converse tool specifications plus a `ToolDispatcher` that routes each tool call to the simulator, classifier, or data store. Tools backed by a missing artifact degrade gracefully.
 
 ### 🤖 Thermal Agent (`src/agent.py`)
-A tool-using agent that runs a reason-act loop — requesting tools, feeding results back, and iterating — until it returns a grounded recommendation along with the full trace of tool calls. The model backend is pluggable (`provider: bedrock | local`).
+A tool-using agent that runs a reason-act loop — requesting tools, feeding results back, and iterating — until it returns a grounded recommendation along with the full trace of tool calls. The model backend is pluggable (`provider: bedrock | local`), the loop's turn budget is set via `agent.max_turns` in the config, and environment variables can override the model/endpoint settings for deployment.
 
 ### 🧠 Open-Weight Backend & Fine-Tuning (`src/backends.py`, `src/training_data.py`, `src/finetune.py`, `src/quantize.py`)
 `LocalToolBackend` runs a self-hosted, QLoRA-fine-tuned Llama 3.3 / Qwen2.5 model (exported to GGUF) behind an OpenAI-compatible endpoint, translating Bedrock Converse ↔ OpenAI tool-calling so it drops straight into the agent loop. The fine-tuning trio builds agentic SFT traces, runs 4-bit QLoRA, and merges + quantizes the adapter to GGUF.
