@@ -54,7 +54,13 @@ class StrategyClassifier:
             )
 
     def prepare_features(self, df):
-        """Label-encode categorical columns for model input.
+        """Fit the label encoders and encode categorical columns for training.
+
+        Warning:
+            This FITS the encoders on ``df`` — it is intended for the training
+            path only. Calling it on a loaded/fitted classifier overwrites the
+            fitted encoders; use ``_encode_features`` semantics (via
+            ``predict``/``predict_proba``) for inference instead.
 
         Args:
             df: DataFrame with raw categorical features.

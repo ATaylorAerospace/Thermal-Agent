@@ -53,6 +53,7 @@ class ThermalAgent:
         region="us-east-1",
         system_prompt=SYSTEM_PROMPT,
         client=None,
+        max_turns=MAX_AGENT_TURNS,
     ):
         """Initialize the agent.
 
@@ -62,11 +63,13 @@ class ThermalAgent:
             region: AWS region.
             system_prompt: System instructions for the agent.
             client: Optional pre-built bedrock-runtime client (for testing).
+            max_turns: Default safety cap on tool-use iterations per run.
         """
         self.dispatcher = dispatcher or ToolDispatcher()
         self.model_id = model_id
         self.system_prompt = system_prompt
         self.client = client or boto3.client("bedrock-runtime", region_name=region)
+        self.max_turns = max_turns
 
     @classmethod
     def from_config(cls, config_path="config/agent_config.yaml"):
@@ -104,35 +107,44 @@ class ThermalAgent:
             logger.warning("Classifier model not found — classify tool will be unavailable")
 
         dispatcher = ToolDispatcher(classifier=classifier, datastore=datastore)
+        max_turns = agent_cfg.get("max_turns", MAX_AGENT_TURNS)
 
         provider = agent_cfg.get("provider", "bedrock")
         if provider == "local":
             from src.backends import LocalToolBackend
 
+            # Environment variables (see .env.example) override the YAML values
+            # so a deployment can retarget the endpoint without editing config.
             local_cfg = config.get("local", {})
+            model = os.getenv("LOCAL_MODEL_NAME") or local_cfg.get("model")
             backend = LocalToolBackend(
-                model=local_cfg.get("model"),
-                base_url=local_cfg.get("base_url"),
-                api_key=local_cfg.get("api_key", "not-needed"),
+                model=model,
+                base_url=os.getenv("LOCAL_MODEL_BASE_URL") or local_cfg.get("base_url"),
+                api_key=os.getenv("LOCAL_MODEL_API_KEY")
+                or local_cfg.get("api_key", "not-needed"),
             )
             return cls(
                 dispatcher=dispatcher,
-                model_id=local_cfg.get("model"),
+                model_id=model,
                 client=backend,
+                max_turns=max_turns,
             )
 
         return cls(
             dispatcher=dispatcher,
-            model_id=agent_cfg.get("model_id", DEFAULT_MODEL_ID),
+            model_id=os.getenv("BEDROCK_AGENT_MODEL_ID")
+            or agent_cfg.get("model_id", DEFAULT_MODEL_ID),
             region=agent_cfg.get("region", "us-east-1"),
+            max_turns=max_turns,
         )
 
-    def run(self, query, max_turns=MAX_AGENT_TURNS):
+    def run(self, query, max_turns=None):
         """Run the agent loop until a final answer is produced.
 
         Args:
             query: The user's thermal scenario question.
-            max_turns: Safety cap on tool-use iterations.
+            max_turns: Safety cap on tool-use iterations. Defaults to the
+                agent's configured ``max_turns``.
 
         Returns:
             Dict with 'answer' (final text) and 'tool_calls' (list of
@@ -141,7 +153,7 @@ class ThermalAgent:
         messages = [{"role": "user", "content": [{"text": query}]}]
         tool_calls = []
 
-        for _ in range(max_turns):
+        for _ in range(max_turns or self.max_turns):
             response = self.client.converse(
                 modelId=self.model_id,
                 messages=messages,
@@ -176,8 +188,12 @@ class ThermalAgent:
                 })
             messages.append({"role": "user", "content": tool_results})
 
-        # Turn budget exhausted — return best-effort text from the last message.
-        return {"answer": self._extract_text(messages[-1]), "tool_calls": tool_calls}
+        # Turn budget exhausted — the last message is always a tool-results
+        # user turn here, so walk back to the most recent assistant text.
+        for message in reversed(messages):
+            if message.get("role") == "assistant":
+                return {"answer": self._extract_text(message), "tool_calls": tool_calls}
+        return {"answer": "", "tool_calls": tool_calls}
 
     def _run_tool(self, tool_use):
         """Dispatch a single tool call, capturing errors as JSON.

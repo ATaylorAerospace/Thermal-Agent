@@ -240,7 +240,7 @@ def build():
 
     # ============================================================ MIDDLE CENTER (engine)
     cx0, cy0 = 430, 250
-    cw, chh = 380, 210
+    cw = 380
     # 3D prediction surface above the chip
     s.append(surface(cx0 + cw / 2, cy0 + 70, 12, 12,
                      hz=60, fn=lambda i, j, n: 0.5 + 0.5 * math.sin(i * 0.85) * math.cos(j * 0.8),
