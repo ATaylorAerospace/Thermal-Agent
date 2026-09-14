@@ -9,7 +9,7 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-Demo-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![XGBoost](https://img.shields.io/badge/XGBoost-Classifier-blue)](https://xgboost.readthedocs.io/)
 [![Open Weights — QLoRA + GGUF](https://img.shields.io/badge/Open%20Weights-QLoRA%20%2B%20GGUF-6f42c1)](https://github.com/ggerganov/llama.cpp)
-[![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-lightgrey.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Contact A Taylor](https://img.shields.io/badge/Contact-A%20Taylor-brightgreen?logo=mail.ru&logoColor=white)](https://ataylor.getform.com/5w8wz)
 
 > **A tool-using agent + physics simulator for recommending thermal mitigation strategies in deep space photonic instruments — runs on managed AWS Bedrock or a self-hosted, fine-tuned open-weight model**
@@ -396,7 +396,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing instructio
 
 ## 📜 License
 
-This work is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+This project is licensed under the [Apache License 2.0](LICENSE) — a permissive license with an explicit patent grant, matching the ecosystem of the ML tooling this project builds on.
+
+The companion [dataset](https://huggingface.co/datasets/Taylor658/deep-space-optical-chip-thermal-dataset) remains separately licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 Copyright (c) 2026 A Taylor
 
