@@ -396,9 +396,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing instructio
 
 ## 📜 License
 
-This project is licensed under the [Apache License 2.0](LICENSE) — a permissive license with an explicit patent grant, matching the ecosystem of the ML tooling this project builds on.
+This project is licensed under the [Apache License 2.0](LICENSE) .
 
-The companion [dataset](https://huggingface.co/datasets/Taylor658/deep-space-optical-chip-thermal-dataset) remains separately licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+The companion [dataset](https://huggingface.co/datasets/Taylor658/deep-space-optical-chip-thermal-dataset) is separately licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 Copyright (c) 2026 A Taylor
 
