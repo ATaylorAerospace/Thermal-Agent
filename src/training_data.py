@@ -86,6 +86,14 @@ def _classify_result(row, classifier=None):
     return {"predicted_strategy": true_strategy, "probabilities": proba}
 
 
+def _search_query(row):
+    """Build the knowledge-store query text for a scenario row."""
+    return (
+        f"{row.get('material_name')} {row.get('instrument')} "
+        f"{row.get('environment_location')} {row.get('thermal_effect')}"
+    )
+
+
 def _search_result(row, datastore=None):
     """Return retrieved scenarios; falls back to synthesized if datastore unavailable.
 
@@ -98,11 +106,7 @@ def _search_result(row, datastore=None):
     """
     if datastore is not None:
         try:
-            query_text = (
-                f"{row.get('material_name')} {row.get('instrument')} "
-                f"{row.get('environment_location')} {row.get('thermal_effect')}"
-            )
-            scenarios = datastore.query(query_text, top_k=1)
+            scenarios = datastore.query(_search_query(row), top_k=1)
             return {"scenarios": scenarios}
         except Exception as exc:
             logger.debug("Data store query failed (%s); using synthesized fallback", exc)
@@ -173,20 +177,24 @@ def _load_or_build_datastore(df, path):
     return store
 
 
-def build_example(row, classifier=None, datastore=None):
+def build_example(row, classifier=None, datastore=None,
+                  classify_result=None, search_result=None):
     """Build a single SFT example (messages + tools) for a dataset row.
 
     Args:
         row: A mapping with scenario fields and a labeled strategy.
         classifier: Optional fitted StrategyClassifier for real classify_strategy results.
         datastore: Optional built ThermalDataStore for real search_thermal_knowledge results.
+        classify_result: Optional precomputed classify_strategy tool result
+            (supplied by build_examples' vectorized batch path).
+        search_result: Optional precomputed search_thermal_knowledge result.
 
     Returns:
         Dict with 'messages' (OpenAI chat format) and 'tools'.
     """
     sim_result = _simulate_result(row)
-    classify_res = _classify_result(row, classifier=classifier)
-    search_res = _search_result(row, datastore=datastore)
+    classify_res = classify_result or _classify_result(row, classifier=classifier)
+    search_res = search_result or _search_result(row, datastore=datastore)
 
     tool_calls = [
         {
@@ -219,8 +227,7 @@ def build_example(row, classifier=None, datastore=None):
             "function": {
                 "name": "search_thermal_knowledge",
                 "arguments": json.dumps({
-                    "query": f"{row.get('material_name')} {row.get('instrument')} "
-                             f"{row.get('environment_location')} {row.get('thermal_effect')}",
+                    "query": _search_query(row),
                     "top_k": 1,
                 }),
             },
@@ -242,8 +249,58 @@ def build_example(row, classifier=None, datastore=None):
     return {"messages": messages, "tools": OPENAI_TOOLS}
 
 
+def _batch_classify_results(df, classifier):
+    """Compute classify results for all rows in one vectorized call.
+
+    Args:
+        df: DataFrame of scenario rows.
+        classifier: Fitted StrategyClassifier, or None.
+
+    Returns:
+        List of classify_strategy tool results, or None to signal the caller
+        to use the per-row path (no classifier, or the batch call failed).
+    """
+    if classifier is None:
+        return None
+    try:
+        probas = classifier.predict_proba_batch(df)
+    except Exception as exc:
+        logger.warning("Batch classification failed (%s); using per-row path", exc)
+        return None
+    return [
+        {"predicted_strategy": max(p, key=p.get), "probabilities": p}
+        for p in probas
+    ]
+
+
+def _batch_search_results(rows, datastore):
+    """Retrieve scenarios for all rows in vectorized chunks.
+
+    Args:
+        rows: List of scenario row dicts.
+        datastore: Built ThermalDataStore, or None.
+
+    Returns:
+        List of search_thermal_knowledge tool results, or None to signal the
+        caller to use the per-row path.
+    """
+    if datastore is None:
+        return None
+    try:
+        hits = datastore.query_batch([_search_query(r) for r in rows], top_k=1)
+    except Exception as exc:
+        logger.warning("Batch retrieval failed (%s); using per-row path", exc)
+        return None
+    return [{"scenarios": h} for h in hits]
+
+
 def build_examples(df, limit=None, classifier=None, datastore=None):
     """Build SFT examples for a DataFrame of scenarios.
+
+    Classifier and data-store tool results are computed in vectorized batches
+    (one XGBoost call, chunked TF-IDF matrix products) rather than per row —
+    orders of magnitude faster on the full 40K-row dataset — with a per-row
+    fallback if a batch path fails.
 
     Args:
         df: DataFrame of scenario rows.
@@ -256,9 +313,20 @@ def build_examples(df, limit=None, classifier=None, datastore=None):
     """
     if limit is not None:
         df = df.head(limit)
+    rows = df.to_dict(orient="records")
+
+    classify_results = _batch_classify_results(df, classifier)
+    search_results = _batch_search_results(rows, datastore)
+
     examples = [
-        build_example(row, classifier=classifier, datastore=datastore)
-        for row in df.to_dict(orient="records")
+        build_example(
+            row,
+            classifier=classifier,
+            datastore=datastore,
+            classify_result=classify_results[i] if classify_results else None,
+            search_result=search_results[i] if search_results else None,
+        )
+        for i, row in enumerate(rows)
     ]
     logger.info("Built %d SFT examples", len(examples))
     return examples
@@ -318,13 +386,16 @@ def run(
     clf_path = classifier_path or os.getenv("CLASSIFIER_PATH", "results/strategy_classifier.pkl")
     ds_path = index_path or os.getenv("INDEX_PATH", "results/thermal_datastore.pkl")
 
-    classifier = _load_or_train_classifier(df, clf_path)
-    datastore = _load_or_build_datastore(df, ds_path)
-
     stratify = df["strategy_type"] if "strategy_type" in df.columns else None
     train_df, val_df = train_test_split(
         df, test_size=val_ratio, random_state=42, stratify=stratify
     )
+
+    # Split BEFORE fitting: on-the-fly components are trained/built on the
+    # training rows only, so validation traces are not generated by tools
+    # that already saw those exact rows (which would understate eval loss).
+    classifier = _load_or_train_classifier(train_df, clf_path)
+    datastore = _load_or_build_datastore(train_df, ds_path)
 
     output_dir = Path(output_dir)
     write_jsonl(

@@ -66,6 +66,28 @@ class TestThermalDataStore:
         results = built_store.query("Laser Communication Terminal", top_k=3)
         assert results[0]["instrument"] == "Laser Communication Terminal"
 
+    def test_top_k_larger_than_corpus_is_clamped(self, built_store, sample_df):
+        """Asking for more results than exist should return the whole corpus."""
+        results = built_store.query("Silicon", top_k=999)
+        assert len(results) == len(sample_df)
+
+    def test_query_batch_matches_query(self, built_store):
+        """query_batch must return the same hits as repeated query() calls."""
+        texts = [
+            "Silicon spectrometer Mars spectral drift",
+            "Indium Phosphide Jovian coupling loss",
+            "Laser Communication Terminal",
+        ]
+        batch = built_store.query_batch(texts, top_k=3, chunk_size=2)
+        assert len(batch) == len(texts)
+        for text, hits in zip(texts, batch):
+            single = built_store.query(text, top_k=3)
+            assert len(hits) == len(single) == 3
+            for a, b in zip(hits, single):
+                assert abs(a["similarity"] - b["similarity"]) < 1e-9
+        # A distinctive query should surface the matching instrument on top.
+        assert batch[2][0]["instrument"] == "Laser Communication Terminal"
+
     def test_save_load_roundtrip(self, built_store):
         """A loaded store should return the same top result as the original."""
         query = "Polymer Outer Solar System waveguide misalignment"

@@ -70,6 +70,30 @@ class TestStrategyClassifier:
         total = sum(proba.values())
         assert abs(total - 1.0) < 1e-6
 
+    def test_unseen_category_degrades_gracefully(self, trained_classifier):
+        """Unseen category values must yield a prediction, not raise."""
+        result = trained_classifier.predict(
+            "Unobtanium", "Alien Scope", "Andromeda", "Quantum Drift"
+        )
+        assert result in {"Passive", "Active", "Hybrid"}
+        proba = trained_classifier.predict_proba(
+            "Unobtanium", "Alien Scope", "Andromeda", "Quantum Drift"
+        )
+        assert abs(sum(proba.values()) - 1.0) < 1e-6
+
+    def test_predict_proba_batch_matches_single(self, trained_classifier, sample_df):
+        """Batch probabilities must match the per-row path exactly."""
+        subset = sample_df.head(5)
+        batch = trained_classifier.predict_proba_batch(subset)
+        assert len(batch) == len(subset)
+        for (_, row), proba in zip(subset.iterrows(), batch):
+            single = trained_classifier.predict_proba(
+                row["material_name"], row["instrument"],
+                row["environment_location"], row["thermal_effect"],
+            )
+            for cls in single:
+                assert abs(single[cls] - proba[cls]) < 1e-9
+
     def test_save_load_roundtrip(self, trained_classifier):
         """Model should produce same predictions after save/load cycle."""
         with tempfile.TemporaryDirectory() as tmpdir:

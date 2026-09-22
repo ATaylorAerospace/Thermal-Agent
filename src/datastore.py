@@ -18,6 +18,7 @@ import os
 from pathlib import Path
 
 import joblib
+import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -45,21 +46,37 @@ class ThermalDataStore:
         self.matrix = None
         self.records = None  # list[dict] of scenario metadata
 
-    def _row_to_text(self, row):
-        """Build the searchable text representation of a scenario row.
+    @staticmethod
+    def _texts_from_df(df):
+        """Build the searchable text for every row with vectorized string ops.
 
         Args:
-            row: A mapping with scenario fields.
+            df: DataFrame containing some or all of the TEXT_COLUMNS.
 
         Returns:
-            A single descriptive string for vectorization.
+            List of descriptive strings, one per row.
         """
-        parts = []
+        combined = None
         for col in TEXT_COLUMNS:
-            value = row.get(col)
-            if value is not None and str(value).lower() != "nan":
-                parts.append(str(value))
-        return " ".join(parts)
+            if col not in df.columns:
+                continue
+            part = df[col].fillna("").astype(str).replace("nan", "", regex=False)
+            combined = part if combined is None else combined + " " + part
+        if combined is None:
+            return [""] * len(df)
+        # Collapse the extra whitespace left by empty fields.
+        return combined.str.split().str.join(" ").tolist()
+
+    @staticmethod
+    def _top_k_indices(scores, top_k):
+        """Return indices of the top_k scores in descending order.
+
+        Uses argpartition (O(n)) instead of a full argsort (O(n log n)) —
+        it only sorts the k winners, not the whole corpus.
+        """
+        top_k = min(top_k, scores.shape[0])
+        idx = np.argpartition(scores, -top_k)[-top_k:]
+        return idx[np.argsort(scores[idx])[::-1]]
 
     def build(self, df):
         """Build the TF-IDF index from a DataFrame of scenarios.
@@ -70,7 +87,7 @@ class ThermalDataStore:
         Returns:
             self, to allow chaining.
         """
-        texts = df.apply(self._row_to_text, axis=1).tolist()
+        texts = self._texts_from_df(df)
         self.matrix = self.vectorizer.fit_transform(texts)
 
         available = [c for c in RESULT_COLUMNS if c in df.columns]
@@ -97,13 +114,48 @@ class ThermalDataStore:
 
         query_vec = self.vectorizer.transform([text])
         scores = cosine_similarity(query_vec, self.matrix)[0]
-        top_idx = scores.argsort()[::-1][:top_k]
 
         results = []
-        for idx in top_idx:
+        for idx in self._top_k_indices(scores, top_k):
             record = dict(self.records[idx])
             record["similarity"] = float(scores[idx])
             results.append(record)
+        return results
+
+    def query_batch(self, texts, top_k=3, chunk_size=256):
+        """Retrieve similar scenarios for many queries in vectorized chunks.
+
+        Each chunk is a single sparse matrix product against the index —
+        orders of magnitude faster than repeated query() calls when building
+        SFT traces. chunk_size bounds the dense score block held in memory.
+
+        Args:
+            texts: List of free-text scenario descriptions.
+            top_k: Number of scenarios to return per query.
+            chunk_size: Number of queries scored per chunk.
+
+        Returns:
+            List with one entry per query, each a list of scenario dicts with
+            'similarity' scores sorted by descending similarity.
+
+        Raises:
+            RuntimeError: If the store has not been built or loaded.
+        """
+        if self.matrix is None or self.records is None:
+            raise RuntimeError("Data store is empty. Call build() or load() first.")
+
+        results = []
+        for start in range(0, len(texts), chunk_size):
+            chunk = texts[start:start + chunk_size]
+            query_mat = self.vectorizer.transform(chunk)
+            score_block = cosine_similarity(query_mat, self.matrix)
+            for scores in score_block:
+                hits = []
+                for idx in self._top_k_indices(scores, top_k):
+                    record = dict(self.records[idx])
+                    record["similarity"] = float(scores[idx])
+                    hits.append(record)
+                results.append(hits)
         return results
 
     def save(self, path):

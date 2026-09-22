@@ -234,6 +234,26 @@ class TestBuildAndWrite:
         assert len(lines) == len(examples)
         assert "messages" in lines[0] and "tools" in lines[0]
 
+    def test_batch_path_matches_per_row(self, sample_df, fitted_classifier, built_datastore):
+        """build_examples' vectorized batch path must produce the same tool
+        results as calling build_example per row."""
+        batch = build_examples(
+            sample_df, classifier=fitted_classifier, datastore=built_datastore
+        )
+        for i, row in enumerate(sample_df.to_dict(orient="records")):
+            single = build_example(
+                row, classifier=fitted_classifier, datastore=built_datastore
+            )
+            b_clf = json.loads(batch[i]["messages"][4]["content"])
+            s_clf = json.loads(single["messages"][4]["content"])
+            assert b_clf["predicted_strategy"] == s_clf["predicted_strategy"]
+            for cls in s_clf["probabilities"]:
+                assert abs(b_clf["probabilities"][cls] - s_clf["probabilities"][cls]) < 1e-9
+            b_kb = json.loads(batch[i]["messages"][5]["content"])["scenarios"]
+            s_kb = json.loads(single["messages"][5]["content"])["scenarios"]
+            assert len(b_kb) == len(s_kb) == 1
+            assert abs(b_kb[0]["similarity"] - s_kb[0]["similarity"]) < 1e-6
+
     def test_build_examples_passes_components(self, sample_df, fitted_classifier, built_datastore):
         """build_examples should forward classifier and datastore to each example."""
         examples = build_examples(
