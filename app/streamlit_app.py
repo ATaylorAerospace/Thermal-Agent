@@ -74,6 +74,26 @@ def get_agent():
     return ThermalAgent.from_config(config_path)
 
 
+@st.cache_data
+def material_comparison_fig():
+    """Bar chart of dn/dT and CTE by material (static data — built once)."""
+    mat_data = []
+    for mat, props in MATERIAL_PROPERTIES.items():
+        mat_data.append({"Material": mat, "Property": "dn/dT", "Value": props["dn_dT"]})
+        mat_data.append({"Material": mat, "Property": "α (CTE)", "Value": props["alpha"]})
+
+    mat_df = pd.DataFrame(mat_data)
+    return px.bar(
+        mat_df,
+        x="Material",
+        y="Value",
+        color="Property",
+        barmode="group",
+        title="dn/dT and Thermal Expansion Coefficient by Material",
+        log_y=True,
+    )
+
+
 @st.cache_resource
 def get_agent_provider():
     """Return the configured agent provider ('bedrock' or 'local')."""
@@ -126,24 +146,9 @@ with tab_sim:
 
         st.markdown(f"**Recommended Strategy:** {result['recommended_strategy_hint']}")
 
-        # Material comparison bar chart
+        # Material comparison bar chart (static data \u2014 cached across runs)
         st.subheader("Material Properties Comparison")
-        mat_data = []
-        for mat, props in MATERIAL_PROPERTIES.items():
-            mat_data.append({"Material": mat, "Property": "dn/dT", "Value": props["dn_dT"]})
-            mat_data.append({"Material": mat, "Property": "\u03b1 (CTE)", "Value": props["alpha"]})
-
-        mat_df = pd.DataFrame(mat_data)
-        fig = px.bar(
-            mat_df,
-            x="Material",
-            y="Value",
-            color="Property",
-            barmode="group",
-            title="dn/dT and Thermal Expansion Coefficient by Material",
-            log_y=True,
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(material_comparison_fig(), width="stretch")
 
 # --- AI Thermal Advisor Tab ---
 with tab_ai:
@@ -221,7 +226,7 @@ with tab_ai:
                                     title="Strategy Probability Distribution",
                                     color=list(proba.keys()),
                                 )
-                                st.plotly_chart(fig_proba, use_container_width=True)
+                                st.plotly_chart(fig_proba, width="stretch")
                             st.json(res)
             except Exception as e:
                 st.error(f"Agent run failed: {e}")

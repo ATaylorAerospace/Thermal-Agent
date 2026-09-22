@@ -78,11 +78,17 @@ class StrategyClassifier:
         return encoded
 
     def _encode_features(self, df):
-        """Transform features using already-fitted encoders."""
-        encoded = pd.DataFrame()
+        """Transform features using already-fitted encoders.
+
+        Category values not seen during training map to the sentinel code -1
+        instead of raising, so novel-but-reasonable inputs degrade to a
+        best-effort prediction rather than a tool error.
+        """
+        encoded = pd.DataFrame(index=df.index)
         for col in self.FEATURE_COLS:
             if col in df.columns:
-                encoded[col] = self.encoders[col].transform(df[col])
+                classes = pd.Index(self.encoders[col].classes_)
+                encoded[col] = classes.get_indexer(df[col])
             else:
                 encoded[col] = 0
         return encoded
@@ -167,6 +173,30 @@ class StrategyClassifier:
         proba = self.model.predict_proba(X)[0]
         classes = self.target_encoder.classes_
         return {cls: float(p) for cls, p in zip(classes, proba)}
+
+    def predict_proba_batch(self, df):
+        """Predict strategy probabilities for a batch of inputs at once.
+
+        One vectorized XGBoost call for the whole DataFrame — orders of
+        magnitude faster than per-row predict_proba when building SFT traces.
+
+        Args:
+            df: DataFrame containing the FEATURE_COLS columns.
+
+        Returns:
+            List of dicts (one per row, in order) mapping strategy name to
+            probability.
+
+        Raises:
+            RuntimeError: If the model has not been fitted.
+        """
+        self._check_is_fitted()
+        X = self._encode_features(df)
+        proba = self.model.predict_proba(X)
+        classes = self.target_encoder.classes_
+        return [
+            {cls: float(p) for cls, p in zip(classes, row)} for row in proba
+        ]
 
     def save(self, path):
         """Save the trained model and encoders to disk.
