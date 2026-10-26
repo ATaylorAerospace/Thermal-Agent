@@ -85,15 +85,22 @@ class LocalToolBackend:
             ``stopReason``.
         """
         oai_messages = self._to_openai_messages(system, messages)
-        oai_tools = bedrock_tools_to_openai(toolConfig["tools"])
+        tools_list = (toolConfig or {}).get("tools") or []
+        oai_tools = bedrock_tools_to_openai(tools_list) if tools_list else []
 
-        completion = self.client.chat.completions.create(
-            model=modelId or self.model,
-            messages=oai_messages,
-            tools=oai_tools,
-            tool_choice="auto",
-        )
-        return self._to_bedrock_response(completion.choices[0].message)
+        kwargs = {
+            "model": modelId or self.model,
+            "messages": oai_messages,
+        }
+        if oai_tools:
+            kwargs["tools"] = oai_tools
+            kwargs["tool_choice"] = "auto"
+
+        completion = self.client.chat.completions.create(**kwargs)
+        choices = getattr(completion, "choices", None)
+        if not choices:
+            raise RuntimeError("Local model backend returned no completion choices.")
+        return self._to_bedrock_response(choices[0].message)
 
     @staticmethod
     def _to_openai_messages(system, messages):
@@ -158,11 +165,24 @@ class LocalToolBackend:
 
         tool_calls = getattr(message, "tool_calls", None) or []
         for call in tool_calls:
+            raw_args = call.function.arguments
+            if isinstance(raw_args, dict):
+                parsed_args = raw_args
+            else:
+                try:
+                    parsed_args = json.loads(raw_args or "{}")
+                except (json.JSONDecodeError, TypeError) as exc:
+                    logger.warning(
+                        "Malformed JSON in tool call '%s' arguments (%s); defaulting to empty dict",
+                        call.function.name,
+                        exc,
+                    )
+                    parsed_args = {}
             content.append({
                 "toolUse": {
                     "toolUseId": call.id,
                     "name": call.function.name,
-                    "input": json.loads(call.function.arguments or "{}"),
+                    "input": parsed_args,
                 }
             })
 

@@ -4,6 +4,8 @@ Tests for the physics-based thermal drift simulator.
 Author: A Taylor
 """
 
+import math
+
 import pytest
 
 from src.simulator import (
@@ -85,3 +87,20 @@ class TestThermalDriftSimulator:
         expected = MATERIAL_PROPERTIES[material]["alpha"] * delta_T
         actual = simulator.compute_mechanical_strain(material, delta_T)
         assert abs(actual - expected) < 1e-12
+
+    @pytest.mark.parametrize("bad_dt", [-10.0, math.nan, math.inf, -math.inf])
+    def test_invalid_delta_t_raises_value_error(self, simulator, bad_dt):
+        """Negative or non-finite delta_T must raise ValueError."""
+        with pytest.raises(ValueError, match="delta_T must be a finite non-negative"):
+            simulator.evaluate("Silicon", "Mars Transit", delta_T=bad_dt)
+        with pytest.raises(ValueError, match="delta_T must be a finite non-negative"):
+            simulator.compute_refractive_index_shift("Silicon", bad_dt)
+        with pytest.raises(ValueError, match="delta_T must be a finite non-negative"):
+            simulator.compute_mechanical_strain("Silicon", bad_dt)
+
+    def test_classify_risk_rejects_nan(self, simulator):
+        """Non-finite delta_n or strain must raise ValueError instead of returning Low."""
+        with pytest.raises(ValueError, match="finite numbers"):
+            simulator.classify_risk(math.nan, 0.0)
+        with pytest.raises(ValueError, match="finite numbers"):
+            simulator.classify_risk(0.0, math.inf)

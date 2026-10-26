@@ -136,3 +136,31 @@ class TestLocalToolBackend:
         result = agent.run("Silicon spectrometer on Mars Transit")
         assert result["answer"] == "Recommended strategy: Active."
         assert result["tool_calls"][0]["name"] == "simulate_thermal_drift"
+
+    def test_malformed_tool_arguments_fallback_to_empty_dict(self):
+        """Malformed JSON in tool call arguments should not crash _to_bedrock_response."""
+        msg = _make_message(
+            content=None,
+            tool_calls=[_make_tool_call("c1", "simulate_thermal_drift", "{bad json")],
+        )
+        resp = LocalToolBackend._to_bedrock_response(msg)
+        assert resp["stopReason"] == "tool_use"
+        assert resp["output"]["message"]["content"][0]["toolUse"]["input"] == {}
+
+    def test_empty_choices_raises_runtime_error(self):
+        """An empty choices list from the endpoint should raise RuntimeError."""
+        empty_client = types.SimpleNamespace(
+            chat=types.SimpleNamespace(
+                completions=types.SimpleNamespace(
+                    create=lambda **_: types.SimpleNamespace(choices=[])
+                )
+            )
+        )
+        backend = LocalToolBackend(model="thermal-agent", client=empty_client)
+        with pytest.raises(RuntimeError, match="no completion choices"):
+            backend.converse(
+                "thermal-agent",
+                [{"role": "user", "content": [{"text": "hi"}]}],
+                [{"text": "sys"}],
+                None,
+            )

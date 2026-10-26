@@ -180,3 +180,36 @@ class TestFromConfig:
         agent = ThermalAgent.from_config(str(config))
         assert isinstance(agent.client, LocalToolBackend)
         assert agent.model_id == "env-model"
+
+    def test_bedrock_aws_region_env_override(self, tmp_path, monkeypatch):
+        """AWS_REGION should override the YAML region when configuring Bedrock."""
+        config = tmp_path / "agent.yaml"
+        config.write_text(
+            "agent:\n"
+            "  provider: bedrock\n"
+            "  region: us-east-1\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("AWS_REGION", "us-west-2")
+        agent = ThermalAgent.from_config(str(config))
+        assert agent.client.meta.region_name == "us-west-2"
+
+    def test_tool_use_stop_reason_without_blocks_returns_text(self):
+        """If stopReason is tool_use but no toolUse blocks exist, return text cleanly."""
+
+        class EmptyToolUseClient:
+            def converse(self, modelId, messages, system, toolConfig):
+                return {
+                    "stopReason": "tool_use",
+                    "output": {
+                        "message": {
+                            "role": "assistant",
+                            "content": [{"text": "Direct answer without tool blocks."}],
+                        }
+                    },
+                }
+
+        agent = ThermalAgent(dispatcher=ToolDispatcher(), client=EmptyToolUseClient())
+        result = agent.run("Test query")
+        assert result["answer"] == "Direct answer without tool blocks."
+        assert result["tool_calls"] == []

@@ -22,7 +22,6 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(levelname)s — %(message)s")
 logger = logging.getLogger(__name__)
 
 # Columns combined into the searchable text for each scenario.
@@ -74,6 +73,8 @@ class ThermalDataStore:
         Uses argpartition (O(n)) instead of a full argsort (O(n log n)) —
         it only sorts the k winners, not the whole corpus.
         """
+        if top_k <= 0 or scores.shape[0] == 0:
+            return np.empty(0, dtype=int)
         top_k = min(top_k, scores.shape[0])
         idx = np.argpartition(scores, -top_k)[-top_k:]
         return idx[np.argsort(scores[idx])[::-1]]
@@ -86,7 +87,12 @@ class ThermalDataStore:
 
         Returns:
             self, to allow chaining.
+
+        Raises:
+            ValueError: If df is None or empty.
         """
+        if df is None or len(df) == 0:
+            raise ValueError("Cannot build data store from an empty DataFrame.")
         texts = self._texts_from_df(df)
         self.matrix = self.vectorizer.fit_transform(texts)
 
@@ -111,6 +117,8 @@ class ThermalDataStore:
         """
         if self.matrix is None or self.records is None:
             raise RuntimeError("Data store is empty. Call build() or load() first.")
+        if top_k <= 0:
+            return []
 
         query_vec = self.vectorizer.transform([text])
         scores = cosine_similarity(query_vec, self.matrix)[0]
@@ -140,9 +148,14 @@ class ThermalDataStore:
 
         Raises:
             RuntimeError: If the store has not been built or loaded.
+            ValueError: If chunk_size is not a positive integer.
         """
         if self.matrix is None or self.records is None:
             raise RuntimeError("Data store is empty. Call build() or load() first.")
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be a positive integer.")
+        if top_k <= 0:
+            return [[] for _ in texts]
 
         results = []
         for start in range(0, len(texts), chunk_size):
@@ -211,6 +224,7 @@ class ThermalDataStore:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(levelname)s — %(message)s")
     parser = argparse.ArgumentParser(
         description="Build the thermal scenario data store. Author: A Taylor"
     )

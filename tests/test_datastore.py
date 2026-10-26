@@ -101,3 +101,19 @@ class TestThermalDataStore:
 
         assert original["instrument"] == restored["instrument"]
         assert abs(original["similarity"] - restored["similarity"]) < 1e-9
+
+    def test_build_empty_dataframe_raises(self):
+        """Building a data store from an empty DataFrame should raise ValueError."""
+        with pytest.raises(ValueError, match="empty DataFrame"):
+            ThermalDataStore().build(pd.DataFrame())
+
+    def test_non_positive_top_k_returns_empty(self, built_store):
+        """top_k <= 0 should return empty results instead of slicing all records."""
+        assert built_store.query("Silicon", top_k=0) == []
+        assert built_store.query("Silicon", top_k=-2) == []
+        assert built_store.query_batch(["Silicon", "Polymer"], top_k=0) == [[], []]
+
+    def test_invalid_chunk_size_raises(self, built_store):
+        """Non-positive chunk_size in query_batch should raise ValueError."""
+        with pytest.raises(ValueError, match="chunk_size must be a positive integer"):
+            built_store.query_batch(["Silicon"], top_k=2, chunk_size=0)

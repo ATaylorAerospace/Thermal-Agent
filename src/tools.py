@@ -11,9 +11,7 @@ Author: A Taylor
 
 import logging
 
-from src.datastore import ThermalDataStore
 from src.simulator import ThermalDriftSimulator
-from src.strategy_classifier import StrategyClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -142,10 +140,11 @@ class ToolDispatcher:
 
     def _simulate(self, tool_input):
         """Run the physics simulator tool."""
+        delta_t = tool_input.get("delta_t", tool_input.get("delta_T"))
         return self.simulator.evaluate(
             tool_input["material"],
             tool_input["environment"],
-            delta_T=tool_input.get("delta_t"),
+            delta_T=delta_t,
         )
 
     def _classify(self, tool_input):
@@ -164,7 +163,7 @@ class ToolDispatcher:
         """Run the knowledge-store retrieval tool."""
         if self.datastore is None:
             return {"error": "Knowledge data store is not available."}
-        results = self.datastore.query(
-            tool_input["query"], top_k=int(tool_input.get("top_k", 3))
-        )
+        raw_top_k = tool_input.get("top_k")
+        top_k = 3 if raw_top_k is None else max(1, int(raw_top_k))
+        results = self.datastore.query(tool_input["query"], top_k=top_k)
         return {"scenarios": results}

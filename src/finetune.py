@@ -23,7 +23,6 @@ import logging
 
 import yaml
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(levelname)s — %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -37,7 +36,7 @@ def load_config(config_path):
         Parsed configuration dict.
     """
     with open(config_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        return yaml.safe_load(f) or {}
 
 
 def run_finetune(config_path="config/finetune_config.yaml"):
@@ -66,7 +65,10 @@ def run_finetune(config_path="config/finetune_config.yaml"):
     train_cfg = config["training"]
 
     logger.info("Loading base model: %s", base_cfg["model_id"])
-    compute_dtype = getattr(torch, quant_cfg.get("bnb_4bit_compute_dtype", "bfloat16"))
+    dtype_name = quant_cfg.get("bnb_4bit_compute_dtype", "bfloat16")
+    compute_dtype = getattr(torch, dtype_name, None)
+    if compute_dtype is None:
+        raise ValueError(f"Unsupported torch compute dtype: {dtype_name!r}")
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=quant_cfg.get("load_in_4bit", True),
         bnb_4bit_quant_type=quant_cfg.get("bnb_4bit_quant_type", "nf4"),
@@ -149,6 +151,7 @@ def run_finetune(config_path="config/finetune_config.yaml"):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(levelname)s — %(message)s")
     parser = argparse.ArgumentParser(
         description="QLoRA fine-tuning for open-weight models. Author: A Taylor"
     )

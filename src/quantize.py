@@ -20,11 +20,11 @@ Author: A Taylor
 import argparse
 import logging
 import subprocess
+import sys
 from pathlib import Path
 
 import yaml
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(levelname)s — %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -38,7 +38,7 @@ def load_config(config_path):
         Parsed configuration dict.
     """
     with open(config_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        return yaml.safe_load(f) or {}
 
 
 def merge_adapter(base_model_id, adapter_dir, merged_dir, trust_remote_code=False):
@@ -96,7 +96,7 @@ def export_gguf(merged_dir, output_path, quant_type, llama_cpp_dir):
 
     logger.info("Converting to GGUF (f16): %s", f16_path)
     subprocess.run(
-        ["python", str(convert_script), str(merged_dir),
+        [sys.executable, str(convert_script), str(merged_dir),
          "--outfile", str(f16_path), "--outtype", "f16"],
         check=True,
     )
@@ -123,10 +123,15 @@ def _find_quantize_binary(llama_cpp_dir):
     Raises:
         FileNotFoundError: If no quantize binary is found.
     """
+    llama_cpp_dir = Path(llama_cpp_dir)
     candidates = [
         llama_cpp_dir / "llama-quantize",
+        llama_cpp_dir / "llama-quantize.exe",
         llama_cpp_dir / "build" / "bin" / "llama-quantize",
+        llama_cpp_dir / "build" / "bin" / "llama-quantize.exe",
+        llama_cpp_dir / "build" / "bin" / "Release" / "llama-quantize.exe",
         llama_cpp_dir / "quantize",
+        llama_cpp_dir / "quantize.exe",
     ]
     for candidate in candidates:
         if candidate.exists():
@@ -166,6 +171,7 @@ def run(config_path="config/finetune_config.yaml"):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(levelname)s — %(message)s")
     parser = argparse.ArgumentParser(
         description="Merge QLoRA adapter and export quantized GGUF. Author: A Taylor"
     )
