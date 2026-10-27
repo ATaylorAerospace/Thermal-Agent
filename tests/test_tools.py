@@ -112,3 +112,26 @@ class TestToolDispatcher:
         """Dispatching an unknown tool should raise ValueError."""
         with pytest.raises(ValueError, match="Unknown tool"):
             ToolDispatcher().dispatch("nonexistent_tool", {})
+
+    def test_search_handles_none_and_non_positive_top_k(self, full_dispatcher):
+        """top_k=None should default to 3 and non-positive top_k should clamp to 1."""
+        res_none = full_dispatcher.dispatch(
+            "search_thermal_knowledge",
+            {"query": "Spectrometer Mars", "top_k": None},
+        )
+        assert len(res_none["scenarios"]) == 3
+
+        res_zero = full_dispatcher.dispatch(
+            "search_thermal_knowledge",
+            {"query": "Spectrometer Mars", "top_k": 0},
+        )
+        assert len(res_zero["scenarios"]) == 1
+
+    def test_simulate_accepts_uppercase_delta_t_key(self):
+        """simulate_thermal_drift should accept either delta_t or delta_T."""
+        dispatcher = ToolDispatcher()
+        res = dispatcher.dispatch(
+            "simulate_thermal_drift",
+            {"material": "Silicon", "environment": "Mars Transit", "delta_T": 275},
+        )
+        assert res["delta_T"] == 275.0

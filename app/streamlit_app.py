@@ -185,7 +185,16 @@ with tab_ai:
     if st.button("Get AI Recommendation", key="run_ai"):
         # AWS credentials are only required for the managed Bedrock backend;
         # the local (self-hosted fine-tuned model) provider needs none.
-        if get_agent_provider() == "bedrock" and not os.getenv("AWS_ACCESS_KEY_ID"):
+        has_aws_creds = any(
+            os.getenv(k)
+            for k in (
+                "AWS_ACCESS_KEY_ID",
+                "AWS_PROFILE",
+                "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+                "AWS_WEB_IDENTITY_TOKEN_FILE",
+            )
+        )
+        if get_agent_provider() == "bedrock" and not has_aws_creds:
             st.warning(
                 "AWS credentials not configured. Please set AWS_ACCESS_KEY_ID, "
                 "AWS_SECRET_ACCESS_KEY, and AWS_REGION in your .env file "
@@ -228,5 +237,5 @@ with tab_ai:
                                 )
                                 st.plotly_chart(fig_proba, width="stretch")
                             st.json(res)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 st.error(f"Agent run failed: {e}")

@@ -24,10 +24,13 @@ from sklearn.model_selection import train_test_split
 
 from src.agent import SYSTEM_PROMPT
 from src.backends import bedrock_tools_to_openai
-from src.simulator import ENVIRONMENT_DELTA_T, MATERIAL_PROPERTIES, ThermalDriftSimulator
+from src.simulator import (
+    ENVIRONMENT_DELTA_T,
+    MATERIAL_PROPERTIES,
+    ThermalDriftSimulator,
+)
 from src.tools import TOOL_SPECS
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(levelname)s — %(message)s")
 logger = logging.getLogger(__name__)
 
 OPENAI_TOOLS = bedrock_tools_to_openai(TOOL_SPECS)
@@ -74,7 +77,7 @@ def _classify_result(row, classifier=None):
             )
             predicted = max(proba, key=proba.get)
             return {"predicted_strategy": predicted, "probabilities": proba}
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.debug("Classifier inference failed (%s); using synthesized fallback", exc)
     # Synthesized fallback — biased toward the labeled strategy.
     strategies = ["Passive", "Active", "Hybrid"]
@@ -108,7 +111,7 @@ def _search_result(row, datastore=None):
         try:
             scenarios = datastore.query(_search_query(row), top_k=1)
             return {"scenarios": scenarios}
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.debug("Data store query failed (%s); using synthesized fallback", exc)
     # Synthesized fallback — single scenario derived from the row itself.
     scenario = {k: row.get(k) for k in
@@ -143,7 +146,9 @@ def _load_or_train_classifier(df, path):
     Returns:
         A fitted StrategyClassifier.
     """
-    from src.strategy_classifier import StrategyClassifier  # lazy — avoids heavy import at module level
+    from src.strategy_classifier import (
+        StrategyClassifier,  # lazy — avoids heavy import at module level
+    )
 
     clf = StrategyClassifier()
     if Path(path).exists():
@@ -165,7 +170,9 @@ def _load_or_build_datastore(df, path):
     Returns:
         A built ThermalDataStore.
     """
-    from src.datastore import ThermalDataStore  # lazy — avoids heavy import at module level
+    from src.datastore import (
+        ThermalDataStore,  # lazy — avoids heavy import at module level
+    )
 
     store = ThermalDataStore()
     if Path(path).exists():
@@ -264,7 +271,7 @@ def _batch_classify_results(df, classifier):
         return None
     try:
         probas = classifier.predict_proba_batch(df)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.warning("Batch classification failed (%s); using per-row path", exc)
         return None
     return [
@@ -288,7 +295,7 @@ def _batch_search_results(rows, datastore):
         return None
     try:
         hits = datastore.query_batch([_search_query(r) for r in rows], top_k=1)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.warning("Batch retrieval failed (%s); using per-row path", exc)
         return None
     return [{"scenarios": h} for h in hits]
@@ -345,8 +352,7 @@ def write_jsonl(examples, path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        for ex in examples:
-            f.write(json.dumps(ex) + "\n")
+        f.writelines(json.dumps(ex) + "\n" for ex in examples)
     logger.info("Wrote %d examples to %s", len(examples), path)
     return path
 
@@ -410,6 +416,7 @@ def run(
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(levelname)s — %(message)s")
     parser = argparse.ArgumentParser(
         description="Build agentic SFT data for open-weight fine-tuning. Author: A Taylor"
     )

@@ -22,7 +22,6 @@ from src.tools import ToolDispatcher
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(levelname)s — %(message)s")
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_ID = "anthropic.claude-3-5-sonnet-20241022-v2:0"
@@ -130,11 +129,16 @@ class ThermalAgent:
                 max_turns=max_turns,
             )
 
+        region = (
+            os.getenv("AWS_REGION")
+            or os.getenv("AWS_DEFAULT_REGION")
+            or agent_cfg.get("region", "us-east-1")
+        )
         return cls(
             dispatcher=dispatcher,
             model_id=os.getenv("BEDROCK_AGENT_MODEL_ID")
             or agent_cfg.get("model_id", DEFAULT_MODEL_ID),
-            region=agent_cfg.get("region", "us-east-1"),
+            region=region,
             max_turns=max_turns,
         )
 
@@ -152,8 +156,9 @@ class ThermalAgent:
         """
         messages = [{"role": "user", "content": [{"text": query}]}]
         tool_calls = []
+        turn_budget = self.max_turns if max_turns is None else max_turns
 
-        for _ in range(max_turns or self.max_turns):
+        for _ in range(turn_budget):
             response = self.client.converse(
                 modelId=self.model_id,
                 messages=messages,
@@ -170,7 +175,7 @@ class ThermalAgent:
                 }
 
             tool_results = []
-            for block in output_message["content"]:
+            for block in output_message.get("content", []):
                 if "toolUse" not in block:
                     continue
                 tool_use = block["toolUse"]
@@ -186,6 +191,11 @@ class ThermalAgent:
                         "content": [{"json": result}],
                     }
                 })
+            if not tool_results:
+                return {
+                    "answer": self._extract_text(output_message),
+                    "tool_calls": tool_calls,
+                }
             messages.append({"role": "user", "content": tool_results})
 
         # Turn budget exhausted — the last message is always a tool-results
@@ -206,7 +216,7 @@ class ThermalAgent:
         """
         try:
             return self.dispatcher.dispatch(tool_use["name"], tool_use["input"])
-        except Exception as exc:  # surface tool errors back to the model
+        except Exception as exc:  # noqa: BLE001 — surface tool errors back to the model
             logger.warning("Tool %s failed: %s", tool_use.get("name"), exc)
             return {"error": str(exc)}
 

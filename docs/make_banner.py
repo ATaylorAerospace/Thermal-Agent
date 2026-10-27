@@ -11,6 +11,7 @@ Run:  python docs/make_banner.py
 Author: A Taylor
 """
 
+import itertools
 import math
 from pathlib import Path
 
@@ -28,7 +29,7 @@ _RAMP = [
 def thermal_color(t):
     """Map t in [0, 1] to a hex colour along the thermal ramp."""
     t = max(0.0, min(1.0, t))
-    for (t0, c0), (t1, c1) in zip(_RAMP, _RAMP[1:]):
+    for (t0, c0), (t1, c1) in itertools.pairwise(_RAMP):
         if t <= t1:
             f = 0 if t1 == t0 else (t - t0) / (t1 - t0)
             r = round(c0[0] + (c1[0] - c0[0]) * f)
@@ -271,11 +272,11 @@ def build():
 
     # ---- connector arrows ----
     s.append('<g stroke="#4fd1c5" stroke-width="2" fill="none" opacity="0.85">')
-    s.append(f'<line x1="315" y1="230" x2="430" y2="300" marker-end="url(#arrow)"/>')      # mat -> engine
-    s.append(f'<line x1="925" y1="230" x2="810" y2="300" marker-end="url(#arrow)"/>')      # env -> engine
-    s.append(f'<line x1="980" y1="240" x2="980" y2="200" opacity="0"/>')
-    s.append(f'<line x1="560" y1="460" x2="430" y2="500" marker-end="url(#arrow)"/>')      # engine -> drift
-    s.append(f'<line x1="700" y1="460" x2="840" y2="500" marker-end="url(#arrow)"/>')      # engine -> mitigation
+    s.append('<line x1="315" y1="230" x2="430" y2="300" marker-end="url(#arrow)"/>')      # mat -> engine
+    s.append('<line x1="925" y1="230" x2="810" y2="300" marker-end="url(#arrow)"/>')      # env -> engine
+    s.append('<line x1="980" y1="240" x2="980" y2="200" opacity="0"/>')
+    s.append('<line x1="560" y1="460" x2="430" y2="500" marker-end="url(#arrow)"/>')      # engine -> drift
+    s.append('<line x1="700" y1="460" x2="840" y2="500" marker-end="url(#arrow)"/>')      # engine -> mitigation
     s.append("</g>")
 
     # ============================================================ BOTTOM LEFT (drift charts)

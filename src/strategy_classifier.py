@@ -7,6 +7,7 @@ Author: A Taylor
 import argparse
 import logging
 from pathlib import Path
+from typing import ClassVar
 
 import joblib
 import pandas as pd
@@ -15,7 +16,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBClassifier
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(levelname)s — %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -28,7 +28,12 @@ class StrategyClassifier:
     Author: A Taylor
     """
 
-    FEATURE_COLS = ["material_name", "instrument", "environment_location", "thermal_effect"]
+    FEATURE_COLS: ClassVar[list[str]] = [
+        "material_name",
+        "instrument",
+        "environment_location",
+        "thermal_effect",
+    ]
 
     def __init__(self):
         """Initialize the classifier and label encoders."""
@@ -228,6 +233,7 @@ class StrategyClassifier:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(levelname)s — %(message)s")
     parser = argparse.ArgumentParser(description="Strategy classifier training. Author: A Taylor")
     parser.add_argument("--dataset", type=str, default="Taylor658/deep-space-optical-chip-thermal-dataset")
     parser.add_argument("--save_path", type=str, default="results/strategy_classifier.pkl")

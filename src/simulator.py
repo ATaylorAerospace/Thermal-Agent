@@ -4,7 +4,7 @@ Physics-based thermal drift simulator for deep-space photonic chips.
 Author: A Taylor
 """
 
-from typing import Optional
+import math
 
 MATERIAL_PROPERTIES: dict[str, dict[str, float]] = {
     "Silicon": {
@@ -54,6 +54,24 @@ class ThermalDriftSimulator:
                 f"Valid materials: {list(MATERIAL_PROPERTIES.keys())}"
             )
 
+    @staticmethod
+    def _validate_delta_t(delta_T: float) -> float:
+        """Validate that the temperature swing is a finite non-negative number.
+
+        Args:
+            delta_T: Temperature change in Kelvin.
+
+        Returns:
+            Validated temperature change as a float.
+
+        Raises:
+            ValueError: If delta_T is not finite or is negative.
+        """
+        value = float(delta_T)
+        if not math.isfinite(value) or value < 0:
+            raise ValueError(f"delta_T must be a finite non-negative number, got {delta_T!r}.")
+        return value
+
     def compute_refractive_index_shift(self, material: str, delta_T: float) -> float:
         """Compute refractive index shift: delta_n = dn/dT * delta_T.
 
@@ -65,11 +83,12 @@ class ThermalDriftSimulator:
             Refractive index shift (float).
 
         Raises:
-            ValueError: If the material is not recognized.
+            ValueError: If the material is not recognized or delta_T is invalid.
         """
         self._validate_material(material)
+        dt = self._validate_delta_t(delta_T)
         dn_dT = MATERIAL_PROPERTIES[material]["dn_dT"]
-        return dn_dT * delta_T
+        return dn_dT * dt
 
     def compute_mechanical_strain(self, material: str, delta_T: float) -> float:
         """Compute mechanical strain: epsilon = alpha * delta_T.
@@ -82,11 +101,12 @@ class ThermalDriftSimulator:
             Mechanical strain (float).
 
         Raises:
-            ValueError: If the material is not recognized.
+            ValueError: If the material is not recognized or delta_T is invalid.
         """
         self._validate_material(material)
+        dt = self._validate_delta_t(delta_T)
         alpha = MATERIAL_PROPERTIES[material]["alpha"]
-        return alpha * delta_T
+        return alpha * dt
 
     def classify_risk(self, delta_n: float, strain: float) -> str:
         """Classify thermal risk based on refractive index shift and strain.
@@ -97,7 +117,12 @@ class ThermalDriftSimulator:
 
         Returns:
             Risk level string: 'Low', 'Moderate', 'High', or 'Critical'.
+
+        Raises:
+            ValueError: If delta_n or strain is not finite.
         """
+        if not (math.isfinite(delta_n) and math.isfinite(strain)):
+            raise ValueError("delta_n and strain must be finite numbers.")
         if abs(delta_n) > 0.05 or abs(strain) > 5e-4:
             return "Critical"
         elif abs(delta_n) > 0.01 or abs(strain) > 2e-4:
@@ -108,7 +133,7 @@ class ThermalDriftSimulator:
             return "Low"
 
     def evaluate(
-        self, material: str, environment: str, delta_T: Optional[float] = None
+        self, material: str, environment: str, delta_T: float | None = None
     ) -> dict:
         """Run a full thermal evaluation for a material-environment combination.
 
@@ -128,6 +153,8 @@ class ThermalDriftSimulator:
                     f"Valid environments: {list(ENVIRONMENT_DELTA_T.keys())}"
                 )
             delta_T = ENVIRONMENT_DELTA_T[environment]
+        else:
+            delta_T = self._validate_delta_t(delta_T)
 
         delta_n = self.compute_refractive_index_shift(material, delta_T)
         strain = self.compute_mechanical_strain(material, delta_T)
