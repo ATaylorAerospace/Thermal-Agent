@@ -43,7 +43,7 @@ This project pairs **deterministic physics** with an **agent that reasons over a
 | 📚 **Scenario Data Store** | Retrieves similar prior cases from the 40K-scenario knowledge base | ✅ Live |
 | 📊 **XGBoost Classifier** | Fast Passive / Active / Hybrid prediction with calibrated probabilities | ✅ Live |
 | 🖥️ **Streamlit App** | Interactive two-mode demo (physics + agentic advisor) | ✅ Live |
-| 🧪 **CI Pipeline** | Automated pytest across Python 3.10–3.12 on every push and PR | ✅ Live |
+| 🧪 **CI Pipeline** | Automated pytest across Python 3.10–3.13 on every push and PR | ✅ Live |
 
 ### Knowledge vs. behavior — two different jobs
 
@@ -294,6 +294,7 @@ Deployments can also retarget the agent without editing YAML — environment var
 | `LOCAL_MODEL_NAME` | `local.model` |
 | `LOCAL_MODEL_BASE_URL` | `local.base_url` |
 | `LOCAL_MODEL_API_KEY` | `local.api_key` |
+| `AWS_REGION` / `AWS_DEFAULT_REGION` | `agent.region` (Bedrock provider) |
 
 ---
 
@@ -303,7 +304,7 @@ Deployments can also retarget the agent without editing YAML — environment var
 Thermal-Agent/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                   # GitHub Actions CI — pytest on 3.10–3.12
+│       └── ci.yml                   # GitHub Actions CI — pytest on 3.10–3.13
 ├── app/
 │   └── streamlit_app.py             # Interactive two-tab demo
 ├── config/
@@ -374,7 +375,7 @@ XGBoost classifier predicting **Passive / Active / Hybrid** strategies with cali
 
 ## 🧪 Testing
 
-Tests run automatically via **GitHub Actions CI** on every push and pull request against Python 3.10, 3.11, and 3.12.
+Tests run automatically via **GitHub Actions CI** on every push and pull request against Python 3.10, 3.11, 3.12, and 3.13.
 
 ```bash
 # Run all tests locally

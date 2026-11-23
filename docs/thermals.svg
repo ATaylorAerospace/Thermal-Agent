@@ -77,7 +77,7 @@
 <text x="930" y="130" font-size="12" fill="#7fe3d6" text-anchor="start" font-weight="700" letter-spacing="0">Environment</text>
 <text x="1095" y="130" font-size="12" fill="#7fe3d6" text-anchor="start" font-weight="700" letter-spacing="0">ΔT (K)</text>
 <text x="1155" y="130" font-size="12" fill="#7fe3d6" text-anchor="start" font-weight="700" letter-spacing="0">Severity</text>
-<text x="930" y="152" font-size="12" fill="#dce6f5" text-anchor="start" font-weight="400" letter-spacing="0">Near-Earth Deep Space</text>
+<text x="930" y="152" font-size="12" fill="#dce6f5" text-anchor="start" font-weight="400" letter-spacing="0">Near Earth Deep Space</text>
 <text x="1095" y="152" font-size="12" fill="#cdd9ec" text-anchor="start" font-weight="400" letter-spacing="0">120</text>
 <text x="1155" y="152" font-size="12" fill="#7fe3d6" text-anchor="start" font-weight="600" letter-spacing="0">Moderate</text>
 <text x="930" y="170" font-size="12" fill="#dce6f5" text-anchor="start" font-weight="400" letter-spacing="0">Mars Transit</text>

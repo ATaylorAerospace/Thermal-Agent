@@ -115,21 +115,30 @@ def run_finetune(config_path="config/finetune_config.yaml"):
             tokenize=False,
         )
 
-    sft_config = SFTConfig(
-        output_dir=train_cfg["output_dir"],
-        num_train_epochs=train_cfg.get("num_train_epochs", 3),
-        per_device_train_batch_size=train_cfg.get("per_device_train_batch_size", 1),
-        gradient_accumulation_steps=train_cfg.get("gradient_accumulation_steps", 16),
-        learning_rate=train_cfg.get("learning_rate", 2e-4),
-        warmup_ratio=train_cfg.get("warmup_ratio", 0.03),
-        lr_scheduler_type=train_cfg.get("lr_scheduler_type", "cosine"),
-        logging_steps=train_cfg.get("logging_steps", 10),
-        save_strategy=train_cfg.get("save_strategy", "epoch"),
-        bf16=train_cfg.get("bf16", True),
-        max_seq_length=train_cfg.get("max_seq_length", 4096),
-        gradient_checkpointing=train_cfg.get("gradient_checkpointing", True),
-        optim=train_cfg.get("optim", "paged_adamw_8bit"),
-    )
+    # trl renamed SFTConfig's `max_seq_length` to `max_length` in newer
+    # releases; pick whichever field this installed version actually has so a
+    # fresh GPU install does not fail with an unexpected-keyword TypeError.
+    import dataclasses
+
+    sft_fields = {f.name for f in dataclasses.fields(SFTConfig)}
+    seq_len_key = "max_seq_length" if "max_seq_length" in sft_fields else "max_length"
+
+    sft_kwargs = {
+        "output_dir": train_cfg["output_dir"],
+        "num_train_epochs": train_cfg.get("num_train_epochs", 3),
+        "per_device_train_batch_size": train_cfg.get("per_device_train_batch_size", 1),
+        "gradient_accumulation_steps": train_cfg.get("gradient_accumulation_steps", 16),
+        "learning_rate": train_cfg.get("learning_rate", 2e-4),
+        "warmup_ratio": train_cfg.get("warmup_ratio", 0.03),
+        "lr_scheduler_type": train_cfg.get("lr_scheduler_type", "cosine"),
+        "logging_steps": train_cfg.get("logging_steps", 10),
+        "save_strategy": train_cfg.get("save_strategy", "epoch"),
+        "bf16": train_cfg.get("bf16", True),
+        seq_len_key: train_cfg.get("max_seq_length", 4096),
+        "gradient_checkpointing": train_cfg.get("gradient_checkpointing", True),
+        "optim": train_cfg.get("optim", "paged_adamw_8bit"),
+    }
+    sft_config = SFTConfig(**sft_kwargs)
 
     trainer = SFTTrainer(
         model=model,
