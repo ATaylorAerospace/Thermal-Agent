@@ -217,7 +217,7 @@ def build():
     s.append(txt(tx + 165, py + 50, "ΔT (K)", size=12, fill="#7fe3d6", weight="700"))
     s.append(txt(tx + 225, py + 50, "Severity", size=12, fill="#7fe3d6", weight="700"))
     envs = [
-        ("Near-Earth Deep Space", "120", "Moderate", "#7fe3d6"),
+        ("Near Earth Deep Space", "120", "Moderate", "#7fe3d6"),
         ("Mars Transit", "150", "Moderate", "#7fe3d6"),
         ("Jovian System", "180", "High", "#f0c642"),
         ("Outer Solar System", "240", "Critical", "#de6b52"),
